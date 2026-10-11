@@ -158,7 +158,7 @@
   // `rerender: false` while a colour picker is open — rebuilding would close it.
   function update({ rerender = true } = {}) {
     applyCss();
-    if (modal && rerender) renderModal();
+    if (modal) rerender ? renderModal() : renderPreview();
     saveSettings();
   }
 
@@ -366,6 +366,7 @@
 
   function renderModal() {
     renderSwitch();
+    renderPreview();
     renderStops();
     modal.addButton.disabled = settings.stops.length >= MAX_STOPS;
   }
@@ -376,6 +377,11 @@
     modal.switchButton.disabled = single;
     // On the row, not the button: disabled buttons don't reliably show tooltips.
     modal.gradientRow.title = single ? "Add a second colour to use a gradient" : "";
+  }
+
+  // The bar at 100 %, from the same gradient string as the stylesheet.
+  function renderPreview() {
+    modal.preview.style.backgroundImage = fillImage(settings);
   }
 
   function renderStops() {
