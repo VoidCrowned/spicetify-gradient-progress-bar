@@ -101,20 +101,40 @@
     return !s.gradient && s.stops[0].kind === "theme";
   }
 
-  // The fill's background image.
+  // The colours actually drawn: all stops for a gradient, otherwise just the first.
+  function activeColours(s) {
+    return s.gradient ? s.stops.map(stopColour) : [stopColour(s.stops[0])];
+  }
+
+  // The fill's background image — also used by the modal preview so the two can't drift.
+  // Stops are evenly spaced.
   function fillImage(s) {
-    const c = stopColour(s.stops[0]);
-    return `linear-gradient(${c}, ${c})`;
+    const colours = activeColours(s);
+    if (colours.length === 1) return `linear-gradient(${colours[0]}, ${colours[0]})`;
+    return `linear-gradient(90deg, ${colours.join(", ")})`;
   }
 
   // Selectors are ≥ 0,2,0 so they beat themes' single-class rules without !important.
   // background-image (not -color) keeps Spotify's hover swap of background-color hidden.
+  //
+  // Compress mode: the fill is a full-width element translated left, so only its rightmost
+  // --progress-bar-transform percent is visible. Sizing the gradient to that slice and
+  // anchoring it right makes the whole gradient span bar start → playhead.
   function buildCss(s) {
     if (isInert(s)) return "";
-    const handle = stopColour(s.stops[0]);
+    const colours = activeColours(s);
+    const handle = colours[colours.length - 1];
+    const compress = s.gradient
+      ? [
+          `  background-size: var(--progress-bar-transform) 100%;`,
+          `  background-position: right center;`,
+          `  background-repeat: no-repeat;`,
+        ]
+      : [];
     return [
       `${SCOPE} ${FILL} {`,
       `  background-image: ${fillImage(s)};`,
+      ...compress,
       `}`,
       `${SCOPE} ${HANDLE} {`,
       `  background-color: ${handle};`,
