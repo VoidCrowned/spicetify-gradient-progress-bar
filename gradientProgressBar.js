@@ -25,6 +25,14 @@
   const SAVE_DELAY = 250;
   const HEX_RE = /^#[0-9a-f]{6}$/i;
 
+  // Song progress bar only — the volume slider is the same component without this test id.
+  const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
+  const FILL = ".x-progressBar-fillColor";
+  const HANDLE = ':is([data-testid="progress-bar-handle"], .progress-bar__slider, .x-progressBar-handle)';
+
+  // Never resolved to a hex, so it follows runtime theme changes (e.g. Hazy's per-song accent).
+  const THEME_COLOUR = "var(--spice-button, var(--spice-text, #1db954))";
+
   // ── Settings ────────────────────────────────────────────────────────────────
 
   function defaultSettings() {
@@ -82,8 +90,53 @@
     Spicetify.LocalStorage.set(STORAGE_KEY, JSON.stringify(settings));
   }
 
+  // ── Rendering ───────────────────────────────────────────────────────────────
+
+  function stopColour(stop) {
+    return stop.kind === "theme" ? THEME_COLOUR : stop.color;
+  }
+
+  // Solid with a theme colour leaves the bar to the theme: no rules at all.
+  function isInert(s) {
+    return !s.gradient && s.stops[0].kind === "theme";
+  }
+
+  // The fill's background image.
+  function fillImage(s) {
+    const c = stopColour(s.stops[0]);
+    return `linear-gradient(${c}, ${c})`;
+  }
+
+  // Selectors are ≥ 0,2,0 so they beat themes' single-class rules without !important.
+  // background-image (not -color) keeps Spotify's hover swap of background-color hidden.
+  function buildCss(s) {
+    if (isInert(s)) return "";
+    const handle = stopColour(s.stops[0]);
+    return [
+      `${SCOPE} ${FILL} {`,
+      `  background-image: ${fillImage(s)};`,
+      `}`,
+      `${SCOPE} ${HANDLE} {`,
+      `  background-color: ${handle};`,
+      `}`,
+      ``,
+    ].join("\n");
+  }
+
+  function applyCss() {
+    let style = document.getElementById("gpb-style");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "gpb-style";
+      document.head.appendChild(style);
+    }
+    const css = buildCss(settings);
+    if (style.textContent !== css) style.textContent = css;
+  }
+
   // ── Start-up ────────────────────────────────────────────────────────────────
 
   let settings = loadSettings();
   window.addEventListener("beforeunload", flushSettings);
+  applyCss();
 })();
