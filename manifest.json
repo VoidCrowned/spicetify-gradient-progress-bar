@@ -1,0 +1,9 @@
+{
+  "name": "Gradient Progress Bar",
+  "description": "Recolour the song progress bar with a solid colour or a multi-stop gradient. Works alongside themes and the waveform extension.",
+  "preview": "preview.png",
+  "main": "gradientProgressBar.js",
+  "readme": "README.md",
+  "authors": [{ "name": "VoidCrowned", "url": "https://github.com/VoidCrowned" }],
+  "tags": ["progress bar", "colour", "gradient", "playback"]
+}
