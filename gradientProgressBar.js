@@ -221,11 +221,19 @@
     update();
   }
 
+  // Picking a colour on a theme stop turns it into a custom stop.
   function setStopColour(id, colour) {
     const stop = findStop(id);
     stop.kind = "custom";
     stop.color = colour;
     update({ rerender: false });
+  }
+
+  function linkStopToTheme(id) {
+    const stop = findStop(id);
+    stop.kind = "theme";
+    delete stop.color;
+    update();
   }
 
   // ── Settings modal ──────────────────────────────────────────────────────────
@@ -251,10 +259,14 @@
 .gpb-dot::-webkit-color-swatch-wrapper { padding: 0; }
 .gpb-dot::-webkit-color-swatch { border: 2px solid rgba(var(--spice-rgb-text), .2); border-radius: 50%; }
 .gpb-dot:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
-.gpb-action { position: absolute; right: -6px; display: none; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background-color: var(--spice-card); color: var(--spice-text); cursor: pointer; }
+.gpb-action, .gpb-badge { position: absolute; right: -6px; display: none; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background-color: var(--spice-card); color: var(--spice-text); }
+.gpb-action { cursor: pointer; }
 .gpb-action:hover { background-color: var(--spice-button); }
 .gpb-remove { top: -6px; }
-.gpb-stop:hover .gpb-action, .gpb-stop:focus-within .gpb-action { display: flex; }
+.gpb-link, .gpb-badge { bottom: -6px; }
+.gpb-badge { pointer-events: none; }
+.gpb-stop:hover .gpb-action, .gpb-stop:focus-within .gpb-action, .gpb-stop.gpb-theme .gpb-badge { display: flex; }
+.gpb-stop.gpb-theme .gpb-link { display: none; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
@@ -264,6 +276,8 @@
 
   const ICON_REMOVE =
     '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const ICON_LINK =
+    '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6.6 9.4l2.8-2.8M7.3 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8.7 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
   let modal = null; // the open modal's elements, or null
 
@@ -295,19 +309,42 @@
     m.addButton.addEventListener("click", addStop);
     m.stopsRow.addEventListener("input", (e) => {
       const dot = e.target.closest(".gpb-dot");
-      if (dot) setStopColour(dot.closest(".gpb-stop").dataset.id, dot.value);
+      if (!dot) return;
+      const el = dot.closest(".gpb-stop");
+      // Updated in place: re-rendering would close the picker.
+      el.classList.remove("gpb-theme");
+      dot.title = "";
+      setStopColour(el.dataset.id, dot.value);
     });
     m.stopsRow.addEventListener("click", (e) => {
       const action = e.target.closest(".gpb-action");
       if (!action) return;
       const id = action.closest(".gpb-stop").dataset.id;
       if (action.classList.contains("gpb-remove")) removeStop(id);
+      else if (action.classList.contains("gpb-link")) linkStopToTheme(id);
     });
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
     modal = m;
     renderModal();
     watchModalClose(m);
+    watchThemeColour(m);
+  }
+
+  // Themes like Hazy rewrite --spice-button inline on :root (e.g. on every songchange),
+  // so keep the theme swatches current while the modal is open.
+  function watchThemeColour(m) {
+    const sync = () => {
+      const colour = resolveStop({ kind: "theme" });
+      for (const dot of m.stopsRow.querySelectorAll(".gpb-theme .gpb-dot")) dot.value = colour;
+    };
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    Spicetify.Player.addEventListener("songchange", sync);
+    m.cleanups.push(() => {
+      observer.disconnect();
+      Spicetify.Player.removeEventListener("songchange", sync);
+    });
   }
 
   // PopupModal has no close callback: hide() removes it from <body>, and another
@@ -349,10 +386,13 @@
       const el = document.createElement("div");
       el.className = "gpb-stop";
       el.dataset.id = stop.id;
+      el.classList.toggle("gpb-theme", stop.kind === "theme");
       // Kept but unused while the gradient is off.
       el.classList.toggle("gpb-unused", !settings.gradient && i > 0);
       el.innerHTML = `
-        <input type="color" class="gpb-dot" aria-label="Colour ${i + 1}">
+        <input type="color" class="gpb-dot" aria-label="Colour ${i + 1}" title="${stop.kind === "theme" ? "Theme colour" : ""}">
+        <span class="gpb-badge" aria-hidden="true">${ICON_LINK}</span>
+        <button type="button" class="gpb-action gpb-link" title="Link to theme colour" aria-label="Link to theme colour">${ICON_LINK}</button>
         ${removable ? `<button type="button" class="gpb-action gpb-remove" title="Remove colour" aria-label="Remove colour">${ICON_REMOVE}</button>` : ""}`;
       el.querySelector(".gpb-dot").value = resolveStop(stop);
       row.appendChild(el);
