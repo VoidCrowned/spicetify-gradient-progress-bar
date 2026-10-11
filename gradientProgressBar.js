@@ -215,6 +215,12 @@
     update();
   }
 
+  // No confirmation: it's quickly undone.
+  function resetSettings() {
+    settings = defaultSettings();
+    update();
+  }
+
   function toggleGradient() {
     if (settings.stops.length < 2) return;
     settings.gradient = !settings.gradient;
@@ -304,7 +310,9 @@
       <div class="gpb-preview"></div>
       <div class="gpb-stops"></div>
       <button type="button" class="gpb-button gpb-add">+ Add colour</button>
-      <div class="gpb-footer"></div>`;
+      <div class="gpb-footer">
+        <button type="button" class="gpb-button gpb-reset">Reset</button>
+      </div>`;
 
     const m = {
       root,
@@ -318,6 +326,7 @@
 
     m.switchButton.addEventListener("click", toggleGradient);
     m.addButton.addEventListener("click", addStop);
+    root.querySelector(".gpb-reset").addEventListener("click", resetSettings);
     m.stopsRow.addEventListener("input", (e) => {
       const dot = e.target.closest(".gpb-dot");
       if (!dot) return;

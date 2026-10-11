@@ -17,7 +17,7 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#7](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/7) | Theme colour stop | ui, compatibility | ✅ |
 | [#8](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/8) | Drag-and-drop reordering of stops | ui | ✅ |
 | [#9](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/9) | Live preview strip in the modal | ui | ✅ |
-| [#10](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/10) | Reset to defaults | ui | |
+| [#10](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/10) | Reset to defaults | ui | ✅ |
 | [#11](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/11) | Compatibility: Hazy theme | compatibility | |
 | [#12](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/12) | Compatibility: playback-bar-waveform extension | compatibility | |
 | [#13](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/13) | Marketplace packaging | packaging | |
