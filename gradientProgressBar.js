@@ -204,12 +204,20 @@
     if (settings.stops.length >= MAX_STOPS) return;
     const last = settings.stops[settings.stops.length - 1];
     settings.stops.push({ id: nextStopId(), kind: "custom", color: resolveStop(last) });
+    if (settings.stops.length === 2) settings.gradient = true; // a second colour implies a gradient
     update();
   }
 
   function removeStop(id) {
     if (settings.stops.length <= 1) return;
     settings.stops = settings.stops.filter((s) => s.id !== id);
+    if (settings.stops.length === 1) settings.gradient = false;
+    update();
+  }
+
+  function toggleGradient() {
+    if (settings.stops.length < 2) return;
+    settings.gradient = !settings.gradient;
     update();
   }
 
@@ -229,6 +237,12 @@
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; color: var(--spice-text); }
 .gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
 .gpb-label { font-weight: 700; }
+.gpb-switch { position: relative; flex: none; width: 40px; height: 22px; padding: 0; border: 0; border-radius: 11px; background-color: rgba(var(--spice-rgb-text), .3); cursor: pointer; transition: background-color .15s; }
+.gpb-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background-color: var(--spice-text); transition: transform .15s; }
+.gpb-switch[aria-checked="true"] { background-color: var(--spice-button); }
+.gpb-switch[aria-checked="true"]::after { transform: translateX(18px); }
+.gpb-switch:disabled { opacity: .5; cursor: not-allowed; }
+.gpb-switch:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-preview { height: 8px; border-radius: 4px; }
 .gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
 .gpb-stop { position: relative; width: 32px; height: 32px; }
@@ -260,6 +274,7 @@
       <style>${MODAL_CSS}</style>
       <div class="gpb-gradient-row">
         <span class="gpb-label" id="gpb-gradient-label">Gradient</span>
+        <button type="button" class="gpb-switch" role="switch" aria-labelledby="gpb-gradient-label"></button>
       </div>
       <div class="gpb-preview"></div>
       <div class="gpb-stops"></div>
@@ -269,12 +284,14 @@
     const m = {
       root,
       gradientRow: root.querySelector(".gpb-gradient-row"),
+      switchButton: root.querySelector(".gpb-switch"),
       preview: root.querySelector(".gpb-preview"),
       stopsRow: root.querySelector(".gpb-stops"),
       addButton: root.querySelector(".gpb-add"),
       cleanups: [],
     };
 
+    m.switchButton.addEventListener("click", toggleGradient);
     m.addButton.addEventListener("click", addStop);
     m.stopsRow.addEventListener("input", (e) => {
       const dot = e.target.closest(".gpb-dot");
@@ -311,8 +328,17 @@
   }
 
   function renderModal() {
+    renderSwitch();
     renderStops();
     modal.addButton.disabled = settings.stops.length >= MAX_STOPS;
+  }
+
+  function renderSwitch() {
+    const single = settings.stops.length < 2;
+    modal.switchButton.setAttribute("aria-checked", String(settings.gradient));
+    modal.switchButton.disabled = single;
+    // On the row, not the button: disabled buttons don't reliably show tooltips.
+    modal.gradientRow.title = single ? "Add a second colour to use a gradient" : "";
   }
 
   function renderStops() {
