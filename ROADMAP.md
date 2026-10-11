@@ -6,23 +6,23 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 
 Solid colour or a gradient that always spans bar start → playhead (Compress mode), a stop that follows the theme colour, and clean coexistence with Hazy and playback-bar-waveform.
 
-| # | Issue | Area |
-|---|---|---|
-| [#1](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/1) | Scoped stylesheet engine (inert by default) | rendering |
-| [#2](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/2) | Settings schema, persistence and validation | core |
-| [#3](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/3) | Settings modal: entry point and layout | ui |
-| [#4](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/4) | Colour stops: pickers, add and remove | ui |
-| [#5](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/5) | Gradient switch behaviour | ui |
-| [#6](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/6) | Gradient rendering: Compress mode + handle colour | rendering |
-| [#7](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/7) | Theme colour stop | ui, compatibility |
-| [#8](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/8) | Drag-and-drop reordering of stops | ui |
-| [#9](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/9) | Live preview strip in the modal | ui |
-| [#10](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/10) | Reset to defaults | ui |
-| [#11](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/11) | Compatibility: Hazy theme | compatibility |
-| [#12](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/12) | Compatibility: playback-bar-waveform extension | compatibility |
-| [#13](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/13) | Marketplace packaging | packaging |
-| [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14) | v0.1.0 manual test pass (visual checklist, ≤ 8 items) | testing |
-| [#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23) | Built-in self-test: `__gpb.selfTest()` | testing |
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#1](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/1) | Scoped stylesheet engine (inert by default) | rendering | |
+| [#2](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/2) | Settings schema, persistence and validation | core | ✅ |
+| [#3](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/3) | Settings modal: entry point and layout | ui | |
+| [#4](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/4) | Colour stops: pickers, add and remove | ui | |
+| [#5](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/5) | Gradient switch behaviour | ui | |
+| [#6](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/6) | Gradient rendering: Compress mode + handle colour | rendering | |
+| [#7](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/7) | Theme colour stop | ui, compatibility | |
+| [#8](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/8) | Drag-and-drop reordering of stops | ui | |
+| [#9](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/9) | Live preview strip in the modal | ui | |
+| [#10](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/10) | Reset to defaults | ui | |
+| [#11](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/11) | Compatibility: Hazy theme | compatibility | |
+| [#12](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/12) | Compatibility: playback-bar-waveform extension | compatibility | |
+| [#13](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/13) | Marketplace packaging | packaging | |
+| [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14) | v0.1.0 manual test pass (visual checklist, ≤ 8 items) | testing | |
+| [#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23) | Built-in self-test: `__gpb.selfTest()` | testing | |
 
 Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
 
