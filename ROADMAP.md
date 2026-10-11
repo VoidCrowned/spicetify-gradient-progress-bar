@@ -10,7 +10,7 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 |---|---|---|---|
 | [#1](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/1) | Scoped stylesheet engine (inert by default) | rendering | ✅ |
 | [#2](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/2) | Settings schema, persistence and validation | core | ✅ |
-| [#3](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/3) | Settings modal: entry point and layout | ui | |
+| [#3](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/3) | Settings modal: entry point and layout | ui | ✅ |
 | [#4](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/4) | Colour stops: pickers, add and remove | ui | |
 | [#5](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/5) | Gradient switch behaviour | ui | |
 | [#6](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/6) | Gradient rendering: Compress mode + handle colour | rendering | ✅ |

@@ -154,9 +154,82 @@
     if (style.textContent !== css) style.textContent = css;
   }
 
+  // Called after every settings change: bar first, then the open modal, then storage.
+  function update() {
+    applyCss();
+    if (modal) renderModal();
+    saveSettings();
+  }
+
+  // ── Settings modal ──────────────────────────────────────────────────────────
+  // Colours come only from Spicetify variables so the modal follows any theme.
+  // Never use the id "color-input" or the classes .slider/.toggle/.toggleWrapper —
+  // Hazy looks them up and styles them globally.
+
+  const MODAL_CSS = `
+.gpb-modal { display: flex; flex-direction: column; gap: 20px; color: var(--spice-text); }
+.gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
+.gpb-label { font-weight: 700; }
+.gpb-preview { height: 8px; border-radius: 4px; }
+.gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
+.gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
+.gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
+.gpb-button:disabled { opacity: .5; cursor: not-allowed; }
+.gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-footer { display: flex; justify-content: flex-end; }
+`;
+
+  let modal = null; // the open modal's elements, or null
+
+  function openModal() {
+    const root = document.createElement("div");
+    root.className = "gpb-modal";
+    root.innerHTML = `
+      <style>${MODAL_CSS}</style>
+      <div class="gpb-gradient-row">
+        <span class="gpb-label" id="gpb-gradient-label">Gradient</span>
+      </div>
+      <div class="gpb-preview"></div>
+      <div class="gpb-stops"></div>
+      <div class="gpb-footer"></div>`;
+
+    const m = {
+      root,
+      gradientRow: root.querySelector(".gpb-gradient-row"),
+      preview: root.querySelector(".gpb-preview"),
+      stopsRow: root.querySelector(".gpb-stops"),
+      cleanups: [],
+    };
+
+    Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
+    modal = m;
+    renderModal();
+    watchModalClose(m);
+  }
+
+  // PopupModal has no close callback: hide() removes it from <body>, and another
+  // extension's display() replaces its contents. Either way our root is detached.
+  function watchModalClose(m) {
+    const observer = new MutationObserver(() => {
+      if (!m.root.isConnected) closeModal(m);
+    });
+    observer.observe(document.body, { childList: true });
+    observer.observe(Spicetify.PopupModal, { childList: true });
+    m.cleanups.push(() => observer.disconnect());
+  }
+
+  function closeModal(m) {
+    for (const cleanup of m.cleanups) cleanup();
+    if (modal === m) modal = null;
+    flushSettings();
+  }
+
+  function renderModal() {}
+
   // ── Start-up ────────────────────────────────────────────────────────────────
 
   let settings = loadSettings();
   window.addEventListener("beforeunload", flushSettings);
   applyCss();
+  new Spicetify.Menu.Item("Gradient progress bar", false, openModal).register();
 })();
