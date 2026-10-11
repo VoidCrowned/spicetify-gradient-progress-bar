@@ -229,6 +229,15 @@
     update({ rerender: false });
   }
 
+  // `index` is an insertion point in the current order (0 … length).
+  function moveStop(id, index) {
+    const from = settings.stops.findIndex((s) => s.id === id);
+    if (from === -1 || index === from || index === from + 1) return;
+    const [stop] = settings.stops.splice(from, 1);
+    settings.stops.splice(index > from ? index - 1 : index, 0, stop);
+    update();
+  }
+
   function linkStopToTheme(id) {
     const stop = findStop(id);
     stop.kind = "theme";
@@ -255,6 +264,8 @@
 .gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
 .gpb-stop { position: relative; width: 32px; height: 32px; }
 .gpb-stop.gpb-unused { opacity: .5; }
+.gpb-stop.gpb-dragging { opacity: .3; }
+.gpb-marker { position: absolute; width: 2px; height: 32px; border-radius: 1px; background-color: var(--spice-button); pointer-events: none; }
 .gpb-dot { display: block; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
 .gpb-dot::-webkit-color-swatch-wrapper { padding: 0; }
 .gpb-dot::-webkit-color-swatch { border: 2px solid rgba(var(--spice-rgb-text), .2); border-radius: 50%; }
@@ -329,6 +340,69 @@
     renderModal();
     watchModalClose(m);
     watchThemeColour(m);
+    enableDragAndDrop(m);
+  }
+
+  const STOP_GAP = 12; // matches .gpb-stops gap
+
+  function enableDragAndDrop(m) {
+    const row = m.stopsRow;
+    let dragId = null;
+    let dropIndex = -1;
+
+    const endDrag = () => {
+      dragId = null;
+      row.querySelector(".gpb-dragging")?.classList.remove("gpb-dragging");
+      row.querySelector(".gpb-marker").hidden = true;
+    };
+
+    row.addEventListener("dragstart", (e) => {
+      const el = e.target.closest?.(".gpb-stop");
+      if (!el) return;
+      dragId = el.dataset.id;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", dragId);
+      el.classList.add("gpb-dragging");
+    });
+    row.addEventListener("dragover", (e) => {
+      if (!dragId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      dropIndex = dropIndexAt(row, e.clientX, e.clientY);
+      showDropMarker(row, dropIndex);
+    });
+    row.addEventListener("dragleave", (e) => {
+      if (!row.contains(e.relatedTarget)) row.querySelector(".gpb-marker").hidden = true;
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const id = dragId;
+      endDrag(); // before moveStop: re-rendering detaches the source, so its dragend never reaches us
+      if (id) moveStop(id, dropIndex);
+    });
+    row.addEventListener("dragend", endDrag);
+  }
+
+  // Insertion index under the pointer; the row wraps, so compare line first, then x.
+  function dropIndexAt(row, x, y) {
+    const stops = [...row.querySelectorAll(".gpb-stop")];
+    const i = stops.findIndex((el) => {
+      const r = el.getBoundingClientRect();
+      return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+    });
+    return i === -1 ? stops.length : i;
+  }
+
+  // Absolutely positioned so showing it never reflows the row.
+  function showDropMarker(row, index) {
+    const stops = row.querySelectorAll(".gpb-stop");
+    const marker = row.querySelector(".gpb-marker");
+    const rowRect = row.getBoundingClientRect();
+    const ref = stops[Math.min(index, stops.length - 1)].getBoundingClientRect();
+    const x = index < stops.length ? ref.left - STOP_GAP / 2 : ref.right + STOP_GAP / 2;
+    marker.style.left = `${x - rowRect.left - 1}px`;
+    marker.style.top = `${ref.top - rowRect.top}px`;
+    marker.hidden = false;
   }
 
   // Themes like Hazy rewrite --spice-button inline on :root (e.g. on every songchange),
@@ -392,6 +466,7 @@
       const el = document.createElement("div");
       el.className = "gpb-stop";
       el.dataset.id = stop.id;
+      el.draggable = true;
       el.classList.toggle("gpb-theme", stop.kind === "theme");
       // Kept but unused while the gradient is off.
       el.classList.toggle("gpb-unused", !settings.gradient && i > 0);
@@ -403,6 +478,10 @@
       el.querySelector(".gpb-dot").value = resolveStop(stop);
       row.appendChild(el);
     });
+    const marker = document.createElement("div");
+    marker.className = "gpb-marker";
+    marker.hidden = true;
+    row.appendChild(marker);
   }
 
   // ── Start-up ────────────────────────────────────────────────────────────────
