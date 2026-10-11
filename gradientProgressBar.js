@@ -155,10 +155,69 @@
   }
 
   // Called after every settings change: bar first, then the open modal, then storage.
-  function update() {
+  // `rerender: false` while a colour picker is open — rebuilding would close it.
+  function update({ rerender = true } = {}) {
     applyCss();
-    if (modal) renderModal();
+    if (modal && rerender) renderModal();
     saveSettings();
+  }
+
+  // ── Stops ───────────────────────────────────────────────────────────────────
+
+  function findStop(id) {
+    return settings.stops.find((s) => s.id === id);
+  }
+
+  function nextStopId() {
+    const ids = new Set(settings.stops.map((s) => s.id));
+    let n = 1;
+    while (ids.has(`s${n}`)) n++;
+    return `s${n}`;
+  }
+
+  let colourCtx = null;
+
+  // Any CSS colour → #rrggbb (alpha dropped), or null if it isn't a colour.
+  function toHex(value) {
+    if (!value || !CSS.supports("color", value)) return null;
+    colourCtx ??= document.createElement("canvas").getContext("2d");
+    colourCtx.fillStyle = "#000000";
+    colourCtx.fillStyle = value;
+    const out = colourCtx.fillStyle; // "#rrggbb", or "rgba(r, g, b, a)" when translucent
+    if (out.startsWith("#")) return out;
+    const [r, g, b] = out.match(/[\d.]+/g);
+    return "#" + [r, g, b].map((n) => Math.round(+n).toString(16).padStart(2, "0")).join("");
+  }
+
+  // A stop's current colour as #rrggbb — for UI swatches only; the CSS uses THEME_COLOUR.
+  function resolveStop(stop) {
+    if (stop.kind === "custom") return stop.color;
+    const root = getComputedStyle(document.documentElement);
+    return (
+      toHex(root.getPropertyValue("--spice-button").trim()) ||
+      toHex(root.getPropertyValue("--spice-text").trim()) ||
+      "#1db954"
+    );
+  }
+
+  function addStop() {
+    if (settings.stops.length >= MAX_STOPS) return;
+    const last = settings.stops[settings.stops.length - 1];
+    settings.stops.push({ id: nextStopId(), kind: "custom", color: resolveStop(last) });
+    update();
+  }
+
+  function removeStop(id) {
+    if (settings.stops.length <= 1) return;
+    settings.stops = settings.stops.filter((s) => s.id !== id);
+    update();
+  }
+
+  function setStopColour(id, colour) {
+    const stop = findStop(id);
+    stop.kind = "custom";
+    stop.color = colour;
+    update({ rerender: false });
   }
 
   // ── Settings modal ──────────────────────────────────────────────────────────
@@ -172,12 +231,25 @@
 .gpb-label { font-weight: 700; }
 .gpb-preview { height: 8px; border-radius: 4px; }
 .gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
+.gpb-stop { position: relative; width: 32px; height: 32px; }
+.gpb-stop.gpb-unused { opacity: .5; }
+.gpb-dot { display: block; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.gpb-dot::-webkit-color-swatch-wrapper { padding: 0; }
+.gpb-dot::-webkit-color-swatch { border: 2px solid rgba(var(--spice-rgb-text), .2); border-radius: 50%; }
+.gpb-dot:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-action { position: absolute; right: -6px; display: none; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background-color: var(--spice-card); color: var(--spice-text); cursor: pointer; }
+.gpb-action:hover { background-color: var(--spice-button); }
+.gpb-remove { top: -6px; }
+.gpb-stop:hover .gpb-action, .gpb-stop:focus-within .gpb-action { display: flex; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-footer { display: flex; justify-content: flex-end; }
 `;
+
+  const ICON_REMOVE =
+    '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
   let modal = null; // the open modal's elements, or null
 
@@ -191,6 +263,7 @@
       </div>
       <div class="gpb-preview"></div>
       <div class="gpb-stops"></div>
+      <button type="button" class="gpb-button gpb-add">+ Add colour</button>
       <div class="gpb-footer"></div>`;
 
     const m = {
@@ -198,8 +271,21 @@
       gradientRow: root.querySelector(".gpb-gradient-row"),
       preview: root.querySelector(".gpb-preview"),
       stopsRow: root.querySelector(".gpb-stops"),
+      addButton: root.querySelector(".gpb-add"),
       cleanups: [],
     };
+
+    m.addButton.addEventListener("click", addStop);
+    m.stopsRow.addEventListener("input", (e) => {
+      const dot = e.target.closest(".gpb-dot");
+      if (dot) setStopColour(dot.closest(".gpb-stop").dataset.id, dot.value);
+    });
+    m.stopsRow.addEventListener("click", (e) => {
+      const action = e.target.closest(".gpb-action");
+      if (!action) return;
+      const id = action.closest(".gpb-stop").dataset.id;
+      if (action.classList.contains("gpb-remove")) removeStop(id);
+    });
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
     modal = m;
@@ -224,7 +310,28 @@
     flushSettings();
   }
 
-  function renderModal() {}
+  function renderModal() {
+    renderStops();
+    modal.addButton.disabled = settings.stops.length >= MAX_STOPS;
+  }
+
+  function renderStops() {
+    const row = modal.stopsRow;
+    const removable = settings.stops.length > 1;
+    row.textContent = "";
+    settings.stops.forEach((stop, i) => {
+      const el = document.createElement("div");
+      el.className = "gpb-stop";
+      el.dataset.id = stop.id;
+      // Kept but unused while the gradient is off.
+      el.classList.toggle("gpb-unused", !settings.gradient && i > 0);
+      el.innerHTML = `
+        <input type="color" class="gpb-dot" aria-label="Colour ${i + 1}">
+        ${removable ? `<button type="button" class="gpb-action gpb-remove" title="Remove colour" aria-label="Remove colour">${ICON_REMOVE}</button>` : ""}`;
+      el.querySelector(".gpb-dot").value = resolveStop(stop);
+      row.appendChild(el);
+    });
+  }
 
   // ── Start-up ────────────────────────────────────────────────────────────────
 
