@@ -536,6 +536,21 @@
       .join("; ");
   }
 
+  // Size, shape and masking of the song bar — identical with and without our rules.
+  function barGeometry(fill) {
+    const bar = fill.closest(".progress-bar") ?? fill;
+    const cs = getComputedStyle(bar);
+    const areas = [...bar.querySelectorAll(".x-progressBar-sliderArea")];
+    return JSON.stringify({
+      vars: ["--progress-bar-height", "--progress-bar-radius"].map((v) => cs.getPropertyValue(v).trim()),
+      heights: [bar, ...areas, fill].map((el) => el.offsetHeight),
+      masks: areas.map((a) => {
+        const style = getComputedStyle(a);
+        return style.maskImage || style.webkitMaskImage || "none";
+      }),
+    });
+  }
+
   function setTestSettings(gradient, stops) {
     settings = { version: SCHEMA_VERSION, gradient, stops: stops.map((s) => ({ ...s })) };
     update();
@@ -669,6 +684,8 @@
 
     if (fill) {
       const varsBefore = barVars(fill); // stylesheet is empty here
+      const geometryBefore = barGeometry(fill);
+      const waveform = waveformActive();
       setTestSettings(false, [custom("s1", RED)]);
       const solid = getComputedStyle(fill).backgroundImage;
       check(1, "Solid → song fill has a linear-gradient background-image", solid.startsWith("linear-gradient"), solid);
@@ -695,6 +712,13 @@
       const lastHandle = computedHex(songHandle(), "backgroundColor");
       check(6, "Gradient → handle is the last stop", lastHandle === BLUE, lastHandle);
       check(11, "Bar's --fg-color, --bg-color, --is-active-fg-color untouched", barVars(fill) === varsBefore, barVars(fill));
+      check(12, "Bar height, radius and masks identical with our rules applied", barGeometry(fill) === geometryBefore,
+        barGeometry(fill));
+      if (waveform) {
+        const areas = [...(fill.closest(".progress-bar") ?? fill).querySelectorAll(".x-progressBar-sliderArea")];
+        check(12, "Waveform: both slider areas still masked with a gradient applied", areas.every(hasMaskAnimation),
+          areas.map((a) => getComputedStyle(a).maskImage || getComputedStyle(a).webkitMaskImage).join(" | "));
+      }
     }
 
     setTestSettings(false, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
