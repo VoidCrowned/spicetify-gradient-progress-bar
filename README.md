@@ -46,7 +46,7 @@ Open the profile menu (top right) → **Gradient progress bar**.
 - Click a colour dot to change it.
 - **+ Add colour** adds another; with two or more, gradient mode switches on.
 - Hover a dot to remove it, or to link it to your theme colour.
-- Drag dots to reorder the gradient.
+- Drag a dot by its grip (top-left, shown on hover) to reorder the gradient.
 - **Reset** returns to the default (your theme's own colour, no gradient).
 
 ## Compatibility
@@ -68,21 +68,26 @@ See [ROADMAP.md](ROADMAP.md). Planned beyond v0.1.0: alternative gradient modes 
 
 ## Testing
 
-Run `await __gpb.selfTest()` in the Spotify devtools console — it checks everything that can be checked automatically and prints a pass/fail table ([#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23)). The full list of behaviours covered, by the self-test or by eye ([#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14)):
+Two layers, run before each release:
 
-1. Fresh install → bar looks exactly as before.
-2. Solid custom colour → fill and handle change; volume bar unchanged.
-3. Two or more colours → gradient switches on; full gradient visible from bar start to playhead at 5 %, 50 % and 95 % progress.
-4. Seek by clicking and dragging; hover the bar → no colour flicker.
-5. Remove down to one colour → gradient switches off and the switch is disabled.
-6. Hazy with *Custom color* on → theme stop matches; change it in Hazy → the bar follows.
-7. Hazy with *Custom color* off → theme stop follows the album-art colour across songs.
-8. playback-bar-waveform on → gradient inside the waveform; off → plain bar still correct.
-9. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → works; theme stop falls back sensibly.
-10. Open and close the settings, then open Hazy Settings → Hazy's colour picker and Apply still work.
-11. Reload Spotify → settings persist.
-12. Corrupt the saved settings → defaults are restored with one console warning.
-13. Podcast episode and window resize → no console errors.
+1. **Self-test** ([#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23)). Run `await __gpb.selfTest()` in the Spotify devtools console. It applies test settings through the extension's own code, checks the live bar, restores your settings and prints a pass/fail table. The JSON report is copied to the clipboard. It covers:
+   - Inert by default: empty stylesheet, bar unchanged.
+   - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
+   - Solid and gradient rendering: Compress-mode sizing, stop order, handle colour.
+   - Theme stop: emitted as a CSS variable, follows runtime `--spice-button` changes, and the open modal's swatch follows too.
+   - Switch, add, remove, the 8-stop limit, dimmed unused stops, preview, drag reorder and reset.
+   - Modal clean-up: listeners and observers removed on close, no clashes with Hazy's ids and classes.
+   - Settings: invalid saved settings fall back to defaults with one warning; saves are debounced and survive a save–load round trip.
+   - Bar size, radius and waveform masks unchanged.
+2. **Visual checklist** ([#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14)). What needs a human:
+   1. Hover, click-seek and drag the bar, solid and gradient → no colour flicker; the whole gradient is visible at roughly 5 %, 50 % and 95 %.
+   2. Click a dot → the colour picker opens; drag a dot's grip → a marker shows where it lands and the order changes.
+   3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour; off → plain bar correct.
+   4. Hazy with *Custom color* on → change it and Apply → the bar follows; off → the bar follows the album-art colour across songs.
+   5. After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
+   6. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → bar and modal readable, theme stop falls back sensibly.
+   7. Reload Spotify → settings persist.
+   8. Podcast episode and window resize → no `[gpb]` errors in the console.
 
 ## Contributing
 

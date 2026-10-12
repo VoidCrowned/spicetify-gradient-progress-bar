@@ -142,6 +142,8 @@ ${SCOPE} ${HANDLE} { background-color: <c>; }
 
 Solid also uses `background-image` so Spotify's hover swap of `background-color` stays hidden underneath. Stops are evenly spaced. A **theme stop** is emitted as `var(--spice-button, var(--spice-text, #1db954))`, never a resolved hex (#7).
 
+**Solid with a theme first stop is inert** (empty stylesheet), whether or not unused stops follow — the bar keeps the theme's own colour (`--fg-color`). Decided with the maintainer; it keeps the default state empty (#1).
+
 Other modes (Anchored, Slide) and their CSS are specified in #15.
 
 ## Data model — #2
@@ -158,7 +160,7 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 
 - Entry: profile-menu item → `Spicetify.PopupModal`.
 - Gradient switch off by default; **adding a 2nd stop turns it on**; **removing to 1 stop turns it off**; **disabled with 1 stop**.
-- Native `<input type="color">` dots, round; hover actions remove / link to theme colour; drag-and-drop reorder; max 8 stops; preview strip; reset with no confirmation.
+- Native `<input type="color">` dots, round; hover actions remove / link to theme colour; drag-and-drop reorder **by a grip handle only** (a native colour input inside a draggable element can swallow the drag or start one instead of opening the picker; #8); max 8 stops; preview strip; reset with no confirmation.
 - Theme swatches kept live while the modal is open (MutationObserver on `:root` `style` + `songchange`), disconnected on close.
 - Modal colours only from Spicetify variables.
 

@@ -42,3 +42,4 @@ Agreed ideas, not scheduled.
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
 | [#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21) | Presets and import/export | |
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | needs #15 Anchored |
+| [#24](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/24) | Keyboard reordering of colour stops | accessibility gap from #8 |
