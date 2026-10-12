@@ -528,6 +528,14 @@
   const songchangeCount = () => Spicetify.Player.eventListeners?.songchange?.length ?? 0;
   const computedHex = (el, prop) => (el ? toHex(getComputedStyle(el)[prop]) : null);
 
+  // Variables themes and other extensions read from the bar — we must never change them.
+  function barVars(fill) {
+    const cs = getComputedStyle(fill.closest(".progress-bar") ?? fill);
+    return ["--fg-color", "--bg-color", "--is-active-fg-color"]
+      .map((v) => `${v}: ${cs.getPropertyValue(v).trim()}`)
+      .join("; ");
+  }
+
   function setTestSettings(gradient, stops) {
     settings = { version: SCHEMA_VERSION, gradient, stops: stops.map((s) => ({ ...s })) };
     update();
@@ -660,6 +668,7 @@
     check(1, "Song progress bar found", fill && songHandle(), fill ? "" : "nothing matches SCOPE FILL — Spotify's DOM may have changed");
 
     if (fill) {
+      const varsBefore = barVars(fill); // stylesheet is empty here
       setTestSettings(false, [custom("s1", RED)]);
       const solid = getComputedStyle(fill).backgroundImage;
       check(1, "Solid → song fill has a linear-gradient background-image", solid.startsWith("linear-gradient"), solid);
@@ -685,6 +694,7 @@
       check(6, "Gradient → all stops present, in order", order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1])), img);
       const lastHandle = computedHex(songHandle(), "backgroundColor");
       check(6, "Gradient → handle is the last stop", lastHandle === BLUE, lastHandle);
+      check(11, "Bar's --fg-color, --bg-color, --is-active-fg-color untouched", barVars(fill) === varsBefore, barVars(fill));
     }
 
     setTestSettings(false, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
@@ -709,6 +719,13 @@
     if (fill) {
       const themeHandle = computedHex(songHandle(), "backgroundColor");
       check(7, "Theme stop on the live bar = current --spice-button", themeHandle === expected, themeHandle);
+      // Hazy rewrites --spice-button inline on :root on every songchange.
+      rootStyle.setProperty("--spice-button", PROBE, "important");
+      const followedHandle = computedHex(songHandle(), "backgroundColor");
+      const followedFill = getComputedStyle(fill).backgroundImage;
+      restoreButton();
+      check(11, "Runtime --spice-button change (as Hazy does per song) → bar follows, no JS",
+        followedHandle === PROBE && followedFill.includes("rgb(18, 52, 86)"), `handle ${followedHandle}`);
     }
 
     // ── Modal ──
@@ -735,6 +752,9 @@
     );
     check(3, "Every id and class in the modal starts with gpb-", !foreign.length,
       foreign.map((el) => `${el.tagName.toLowerCase()}#${el.id}.${[...el.classList].join(".")}`).join(", ") || "all prefixed");
+    const hazyHooks = m.root.querySelectorAll("#color-input, .slider, .toggle, .toggleWrapper, select");
+    check(11, "Modal uses none of Hazy's global hooks (#color-input, .slider, .toggle, .toggleWrapper, select)",
+      !hazyHooks.length, `${hazyHooks.length} found`);
     const colorInput = document.getElementById("color-input");
     check(3, "No id=color-input of ours (Hazy looks it up)", !colorInput || !m.root.contains(colorInput),
       colorInput ? "exists, but it's not ours" : "none in the document");
@@ -758,6 +778,13 @@
       const bar = getComputedStyle(fill).backgroundImage;
       check(9, "Preview shows the same gradient as the bar", preview === bar, preview);
     }
+
+    rootStyle.setProperty("--spice-button", PROBE, "important");
+    await tick(); // let the :root MutationObserver run
+    const swatch = m.stopsRow.querySelector(".gpb-theme .gpb-dot")?.value;
+    restoreButton();
+    await tick();
+    check(11, "Open modal: theme swatch follows a runtime --spice-button change", swatch === PROBE, swatch);
 
     const firstStop = m.stopsRow.querySelector(".gpb-stop");
     const dot = firstStop.querySelector(".gpb-dot");
@@ -801,6 +828,8 @@
       `${listenersBefore} → ${listenersOpen} → ${songchangeCount()}`);
     check(7, "Modal observers disconnected on close", observersOpen > 0 && liveObservers === 0 && modal === null,
       `${observersOpen} → ${liveObservers}`);
+    check(11, "Nothing of ours left in the page after close (Hazy Settings can open cleanly)",
+      !document.querySelector(".gpb-modal, .gpb-stop, .gpb-switch"), "");
 
     // ── Persistence ──
     const invalid = {
