@@ -19,6 +19,7 @@
   while (!Spicetify?.LocalStorage || !Spicetify?.Menu || !Spicetify?.PopupModal || !Spicetify?.Player)
     await new Promise((r) => setTimeout(r, 300));
 
+  const VERSION = "0.1.0";
   const STORAGE_KEY = "gpb:settings";
   const SCHEMA_VERSION = 1;
   const MAX_STOPS = 8;
@@ -59,8 +60,7 @@
     return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, stops };
   }
 
-  function loadSettings() {
-    const raw = Spicetify.LocalStorage.get(STORAGE_KEY);
+  function loadSettings(raw = Spicetify.LocalStorage.get(STORAGE_KEY)) {
     if (raw == null) return defaultSettings();
 
     let valid = null;
@@ -428,27 +428,37 @@
       const colour = resolveStop({ kind: "theme" });
       for (const dot of m.stopsRow.querySelectorAll(".gpb-theme .gpb-dot")) dot.value = colour;
     };
-    const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    modalObserver(m, sync).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     Spicetify.Player.addEventListener("songchange", sync);
-    m.cleanups.push(() => {
-      observer.disconnect();
-      Spicetify.Player.removeEventListener("songchange", sync);
-    });
+    m.cleanups.push(() => Spicetify.Player.removeEventListener("songchange", sync));
   }
 
   // PopupModal has no close callback: hide() removes it from <body>, and another
   // extension's display() replaces its contents. Either way our root is detached.
   function watchModalClose(m) {
-    const observer = new MutationObserver(() => {
+    const observer = modalObserver(m, () => {
       if (!m.root.isConnected) closeModal(m);
     });
     observer.observe(document.body, { childList: true });
     observer.observe(Spicetify.PopupModal, { childList: true });
-    m.cleanups.push(() => observer.disconnect());
+  }
+
+  let liveObservers = 0; // checked by the self-test
+
+  // A MutationObserver that is disconnected when the modal closes.
+  function modalObserver(m, callback) {
+    const observer = new MutationObserver(callback);
+    liveObservers++;
+    m.cleanups.push(() => {
+      observer.disconnect();
+      liveObservers--;
+    });
+    return observer;
   }
 
   function closeModal(m) {
+    if (m.closed) return;
+    m.closed = true;
     for (const cleanup of m.cleanups) cleanup();
     if (modal === m) modal = null;
     flushSettings();
@@ -500,10 +510,333 @@
     row.appendChild(marker);
   }
 
+  // ── Self-test ───────────────────────────────────────────────────────────────
+  // `await __gpb.selfTest()` in devtools. Drives the same functions and modal DOM the UI
+  // uses, checks computed styles on the live bar, then restores everything it touched.
+
+  const RED = "#ff0000";
+  const GREEN = "#00ff00";
+  const BLUE = "#0000ff";
+  const PROBE = "#123456"; // stand-in theme colour
+
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const custom = (id, color) => ({ id, kind: "custom", color });
+  const theme = (id) => ({ id, kind: "theme" });
+  const styleText = () => document.getElementById("gpb-style")?.textContent ?? null;
+  const songFill = () => document.querySelector(`${SCOPE} ${FILL}`);
+  const songHandle = () => document.querySelector(`${SCOPE} ${HANDLE}`);
+  const songchangeCount = () => Spicetify.Player.eventListeners?.songchange?.length ?? 0;
+  const computedHex = (el, prop) => (el ? toHex(getComputedStyle(el)[prop]) : null);
+
+  function setTestSettings(gradient, stops) {
+    settings = { version: SCHEMA_VERSION, gradient, stops: stops.map((s) => ({ ...s })) };
+    update();
+  }
+
+  // Declarations our stylesheet must never contain (CLAUDE.md → Hard rules).
+  const FORBIDDEN_PROP =
+    /^(-webkit-)?(mask(-.+)?|height|width|transform|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
+
+  function cssProblems(css) {
+    const problems = [];
+    if (/!important/i.test(css)) problems.push("!important");
+    for (const [, selector] of css.matchAll(/([^{}]+)\{/g))
+      if (!selector.trim().startsWith(SCOPE)) problems.push(`unscoped rule: ${selector.trim()}`);
+    for (const [, body] of css.matchAll(/\{([^}]*)\}/g))
+      for (const decl of body.split(";")) {
+        const prop = decl.split(":")[0].trim();
+        if (FORBIDDEN_PROP.test(prop)) problems.push(`sets ${prop}`);
+      }
+    return problems;
+  }
+
+  // playback-bar-waveform masks the song bar's slider areas with held Web Animations.
+  function hasMaskAnimation(el) {
+    return el.getAnimations().some(
+      (a) =>
+        a.playState !== "idle" &&
+        a.effect?.getKeyframes().some((k) => Object.keys(k).some((p) => /^(webkitM|m)ask/.test(p)))
+    );
+  }
+
+  function waveformActive() {
+    if (!document.getElementById("progress_bar_waveform_mask")) return false;
+    return [...document.querySelectorAll(`${SCOPE} .x-progressBar-sliderArea`)].some(hasMaskAnimation);
+  }
+
+  function environment() {
+    return {
+      extension: VERSION,
+      spotify: Spicetify.Platform?.version ?? null,
+      theme: Spicetify.Config?.current_theme ?? null,
+      colourScheme: Spicetify.Config?.color_scheme ?? null,
+      extensions: Spicetify.Config?.extensions ?? null,
+      waveform: waveformActive(),
+      spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
+    };
+  }
+
+  async function copyText(text) {
+    try {
+      if (Spicetify.Platform?.ClipboardAPI?.copy) await Spicetify.Platform.ClipboardAPI.copy(text);
+      else await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  let selfTestRunning = false;
+
+  async function selfTest() {
+    if (selfTestRunning) return console.warn("[gpb] The self-test is already running.");
+    selfTestRunning = true;
+
+    const results = [];
+    const check = (issue, name, pass, detail = "") =>
+      results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
+
+    const env = environment();
+    const savedSettings = structuredClone(settings);
+    const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
+    const rootStyle = document.documentElement.style;
+    const savedButton = [rootStyle.getPropertyValue("--spice-button"), rootStyle.getPropertyPriority("--spice-button")];
+    const restoreButton = () =>
+      savedButton[0]
+        ? rootStyle.setProperty("--spice-button", savedButton[0], savedButton[1])
+        : rootStyle.removeProperty("--spice-button");
+
+    if (modal) {
+      Spicetify.PopupModal.hide();
+      closeModal(modal);
+    }
+
+    try {
+      await runChecks(check, rootStyle, restoreButton);
+    } catch (e) {
+      check(23, "Self-test ran to completion", false, e?.stack || e);
+    } finally {
+      if (modal) {
+        Spicetify.PopupModal.hide();
+        closeModal(modal);
+      }
+      restoreButton();
+      clearTimeout(saveTimer);
+      saveTimer = 0;
+      settings = savedSettings;
+      applyCss();
+      if (savedRaw == null) Spicetify.LocalStorage.remove(STORAGE_KEY);
+      else Spicetify.LocalStorage.set(STORAGE_KEY, savedRaw);
+      selfTestRunning = false;
+    }
+
+    const passed = results.filter((r) => r.pass).length;
+    const report = { summary: `${passed}/${results.length} passed`, environment: env, results };
+    console.table(results);
+    console.log(`[gpb] self-test: ${passed}/${results.length} passed`);
+    const copied = await copyText(JSON.stringify(report, null, 2));
+    console.log(copied ? "[gpb] Full report copied to the clipboard." : "[gpb] Couldn't copy the report — it's the return value.");
+    return report;
+  }
+
+  async function runChecks(check, rootStyle, restoreButton) {
+    // ── Rendering ──
+    settings = defaultSettings();
+    update();
+    check(1, "Default settings → #gpb-style is empty", styleText() === "", JSON.stringify(styleText()));
+
+    const samples = [
+      [false, [custom("s1", RED)]],
+      [true, [theme("s1"), custom("s2", RED), custom("s3", BLUE)]],
+      [false, [custom("s1", RED), theme("s2"), custom("s3", BLUE)]],
+    ];
+    const problems = samples.flatMap(([gradient, stops]) =>
+      cssProblems(buildCss({ version: SCHEMA_VERSION, gradient, stops }))
+    );
+    check(1, "CSS: every rule scoped, no !important, no forbidden properties", !problems.length,
+      problems.join("; ") || `${samples.length} samples clean`);
+
+    const fill = songFill();
+    check(1, "Song progress bar found", fill && songHandle(), fill ? "" : "nothing matches SCOPE FILL — Spotify's DOM may have changed");
+
+    if (fill) {
+      setTestSettings(false, [custom("s1", RED)]);
+      const solid = getComputedStyle(fill).backgroundImage;
+      check(1, "Solid → song fill has a linear-gradient background-image", solid.startsWith("linear-gradient"), solid);
+      const others = [...document.querySelectorAll(FILL)].filter((f) => !f.matches(`${SCOPE} ${FILL}`));
+      const touched = others.filter((f) => getComputedStyle(f).backgroundImage !== "none");
+      check(1, "Solid → every other fill (volume) has no background-image", !touched.length,
+        `${others.length} other fill(s), ${touched.length} styled`);
+      const solidHandle = computedHex(songHandle(), "backgroundColor");
+      check(6, "Solid → handle is the solid colour", solidHandle === RED, solidHandle);
+
+      setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+      const cs = getComputedStyle(fill);
+      const transform = cs.getPropertyValue("--progress-bar-transform").trim();
+      const sizeX = cs.backgroundSize.split(" ")[0];
+      check(6, "Gradient → background-size follows --progress-bar-transform",
+        sizeX.endsWith("%") && Math.abs(parseFloat(sizeX) - parseFloat(transform)) < 0.01,
+        `size ${cs.backgroundSize}, transform ${transform}`);
+      check(6, "Gradient → anchored right, no-repeat",
+        cs.backgroundPositionX === "100%" && cs.backgroundRepeat === "no-repeat",
+        `position ${cs.backgroundPosition}, repeat ${cs.backgroundRepeat}`);
+      const img = cs.backgroundImage;
+      const order = ["rgb(255, 0, 0)", "rgb(0, 255, 0)", "rgb(0, 0, 255)"].map((c) => img.indexOf(c));
+      check(6, "Gradient → all stops present, in order", order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1])), img);
+      const lastHandle = computedHex(songHandle(), "backgroundColor");
+      check(6, "Gradient → handle is the last stop", lastHandle === BLUE, lastHandle);
+    }
+
+    setTestSettings(false, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    const firstOnly = styleText();
+    check(4, "Gradient off with 3 stops → CSS uses the first stop only",
+      firstOnly.includes(RED) && !firstOnly.includes(GREEN) && !firstOnly.includes(BLUE), firstOnly.replace(/\s+/g, " "));
+
+    // ── Theme colour ──
+    setTestSettings(true, [theme("s1"), theme("s2")]);
+    const themeCss = styleText();
+    check(7, "Theme stop emits var(--spice-button …), never a resolved hex",
+      themeCss.includes(THEME_COLOUR) && !/#[0-9a-f]{3,8}\b/i.test(themeCss.replaceAll(THEME_COLOUR, "")),
+      themeCss.replace(/\s+/g, " "));
+    const rootCs = getComputedStyle(document.documentElement);
+    const expected =
+      toHex(rootCs.getPropertyValue("--spice-button").trim()) ||
+      toHex(rootCs.getPropertyValue("--spice-text").trim()) ||
+      "#1db954";
+    const resolved = resolveStop(theme("x"));
+    check(7, "Theme stop resolves to the current computed --spice-button", resolved === expected,
+      `${resolved} vs ${expected}${rootCs.getPropertyValue("--spice-button").trim() ? "" : " (--spice-button unset, fallback)"}`);
+    if (fill) {
+      const themeHandle = computedHex(songHandle(), "backgroundColor");
+      check(7, "Theme stop on the live bar = current --spice-button", themeHandle === expected, themeHandle);
+    }
+
+    // ── Modal ──
+    settings = defaultSettings();
+    update();
+    const listenersBefore = songchangeCount();
+    openModal();
+    const m = modal;
+    check(3, "Modal opens", m?.root.isConnected, "");
+    if (!m) return;
+
+    check(5, "One stop → switch disabled, gradient off", m.switchButton.disabled && !settings.gradient,
+      `disabled ${m.switchButton.disabled}, gradient ${settings.gradient}`);
+    m.addButton.click();
+    check(5, "Adding a 2nd stop → gradient on, switch enabled",
+      settings.stops.length === 2 && settings.gradient && m.switchButton.getAttribute("aria-checked") === "true" && !m.switchButton.disabled,
+      `${settings.stops.length} stops, gradient ${settings.gradient}`);
+    check(4, "New stop = last stop's resolved colour",
+      settings.stops[1].kind === "custom" && settings.stops[1].color === resolveStop(settings.stops[0]),
+      `${settings.stops[1].color} vs ${resolveStop(settings.stops[0])}`);
+
+    const foreign = [m.root, ...m.root.querySelectorAll("*")].filter(
+      (el) => (el.id && !el.id.startsWith("gpb-")) || [...el.classList].some((c) => !c.startsWith("gpb-"))
+    );
+    check(3, "Every id and class in the modal starts with gpb-", !foreign.length,
+      foreign.map((el) => `${el.tagName.toLowerCase()}#${el.id}.${[...el.classList].join(".")}`).join(", ") || "all prefixed");
+    const colorInput = document.getElementById("color-input");
+    check(3, "No id=color-input of ours (Hazy looks it up)", !colorInput || !m.root.contains(colorInput),
+      colorInput ? "exists, but it's not ours" : "none in the document");
+
+    m.stopsRow.querySelectorAll(".gpb-remove")[1].click();
+    check(5, "Removing back to one stop → gradient off, switch disabled",
+      settings.stops.length === 1 && !settings.gradient && m.switchButton.disabled,
+      `${settings.stops.length} stop(s), gradient ${settings.gradient}`);
+
+    for (let i = 0; i < MAX_STOPS + 2; i++) m.addButton.click();
+    check(4, "Add stops at 8, button disabled", settings.stops.length === MAX_STOPS && m.addButton.disabled,
+      `${settings.stops.length} stops, disabled ${m.addButton.disabled}`);
+
+    setTestSettings(false, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    const opacities = [...m.stopsRow.querySelectorAll(".gpb-stop")].map((el) => getComputedStyle(el).opacity);
+    check(4, "Gradient off with 3 stops → stops 2–3 at 50 % opacity", opacities.join() === "1,0.5,0.5", opacities.join(", "));
+
+    setTestSettings(true, [theme("s1"), custom("s2", RED)]);
+    if (fill) {
+      const preview = getComputedStyle(m.preview).backgroundImage;
+      const bar = getComputedStyle(fill).backgroundImage;
+      check(9, "Preview shows the same gradient as the bar", preview === bar, preview);
+    }
+
+    const firstStop = m.stopsRow.querySelector(".gpb-stop");
+    const dot = firstStop.querySelector(".gpb-dot");
+    dot.value = GREEN;
+    dot.dispatchEvent(new Event("input", { bubbles: true }));
+    check(7, "Picking a colour on a theme dot → custom, without re-rendering (picker stays open)",
+      settings.stops[0].kind === "custom" && settings.stops[0].color === GREEN && firstStop.isConnected && !firstStop.classList.contains("gpb-theme"),
+      JSON.stringify(settings.stops[0]));
+
+    m.stopsRow.querySelectorAll(".gpb-link")[1].click();
+    check(7, "'Link to theme colour' turns a custom stop into a theme stop",
+      settings.stops[1].kind === "theme" && !("color" in settings.stops[1]), JSON.stringify(settings.stops[1]));
+
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    const draggable = [...m.stopsRow.querySelectorAll('[draggable="true"]')];
+    const stopEls = m.stopsRow.querySelectorAll(".gpb-stop");
+    const dt = new DataTransfer();
+    stopEls[0].querySelector(".gpb-grip").dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+    const lastRect = stopEls[2].getBoundingClientRect();
+    const at = { clientX: lastRect.right + 4, clientY: lastRect.top + lastRect.height / 2 };
+    m.stopsRow.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
+    const markerShown = !m.stopsRow.querySelector(".gpb-marker").hidden;
+    m.stopsRow.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
+    const order = settings.stops.map((s) => s.id).join();
+    check(8, "Dragging stop 1's grip past the last stop moves it to the end",
+      order === "s2,s3,s1" && markerShown, `order ${order}, marker shown ${markerShown}`);
+    check(8, "Only the grips are draggable, never the colour inputs",
+      draggable.length === 3 && draggable.every((el) => el.classList.contains("gpb-grip")),
+      draggable.map((el) => el.className).join(", "));
+
+    m.root.querySelector(".gpb-reset").click();
+    check(10, "Reset → defaults and an empty stylesheet",
+      JSON.stringify(settings) === JSON.stringify(defaultSettings()) && styleText() === "", JSON.stringify(settings));
+
+    const listenersOpen = songchangeCount();
+    const observersOpen = liveObservers;
+    Spicetify.PopupModal.hide();
+    await tick();
+    check(7, "songchange listener: +1 while open, removed on close",
+      listenersOpen === listenersBefore + 1 && songchangeCount() === listenersBefore,
+      `${listenersBefore} → ${listenersOpen} → ${songchangeCount()}`);
+    check(7, "Modal observers disconnected on close", observersOpen > 0 && liveObservers === 0 && modal === null,
+      `${observersOpen} → ${liveObservers}`);
+
+    // ── Persistence ──
+    const invalid = {
+      "corrupt JSON": "{broken",
+      "bad hex": JSON.stringify({ version: 1, gradient: false, stops: [{ id: "s1", kind: "custom", color: "red" }] }),
+      "unknown version": JSON.stringify({ version: 99, gradient: false, stops: [theme("s1")] }),
+      "9 stops": JSON.stringify({ version: 1, gradient: true, stops: Array.from({ length: 9 }, (_, i) => theme(`s${i}`)) }),
+    };
+    for (const [label, raw] of Object.entries(invalid)) {
+      const warnings = [];
+      const warn = console.warn;
+      console.warn = (...args) => warnings.push(args.join(" "));
+      let loaded;
+      try {
+        loaded = loadSettings(raw);
+      } finally {
+        console.warn = warn;
+      }
+      const ours = warnings.filter((w) => w.startsWith("[gpb]")).length;
+      check(2, `Invalid stored settings (${label}) → defaults + exactly one [gpb] warning`,
+        JSON.stringify(loaded) === JSON.stringify(defaultSettings()) && ours === 1, `${ours} warning(s)`);
+    }
+
+    setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s4", BLUE)]);
+    const writtenAtOnce = Spicetify.LocalStorage.get(STORAGE_KEY) === JSON.stringify(settings);
+    await new Promise((r) => setTimeout(r, SAVE_DELAY + 100));
+    const reloaded = loadSettings();
+    check(2, "Saves are debounced, then a load returns identical settings",
+      !writtenAtOnce && JSON.stringify(reloaded) === JSON.stringify(settings), `written at once ${writtenAtOnce}`);
+  }
+
   // ── Start-up ────────────────────────────────────────────────────────────────
 
   let settings = loadSettings();
   window.addEventListener("beforeunload", flushSettings);
   applyCss();
   new Spicetify.Menu.Item("Gradient progress bar", false, openModal).register();
+  window.__gpb = { selfTest, version: VERSION };
 })();
