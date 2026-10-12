@@ -280,6 +280,7 @@
 .gpb-action { cursor: pointer; }
 .gpb-action:hover { background-color: var(--spice-button); }
 .gpb-remove { top: -6px; }
+.gpb-grip { top: -6px; right: auto; left: -6px; cursor: grab; }
 .gpb-link, .gpb-badge { bottom: -6px; }
 .gpb-badge { pointer-events: none; }
 .gpb-stop:hover .gpb-action, .gpb-stop:focus-within .gpb-action, .gpb-stop.gpb-theme .gpb-badge { display: flex; }
@@ -295,6 +296,9 @@
     '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   const ICON_LINK =
     '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6.6 9.4l2.8-2.8M7.3 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8.7 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  const ICON_GRIP =
+    '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.3"/><circle cx="10" cy="4" r="1.3"/><circle cx="6" cy="8" r="1.3"/><circle cx="10" cy="8" r="1.3"/><circle cx="6" cy="12" r="1.3"/><circle cx="10" cy="12" r="1.3"/></svg>';
 
   let modal = null; // the open modal's elements, or null
 
@@ -354,6 +358,8 @@
 
   const STOP_GAP = 12; // matches .gpb-stops gap
 
+  // Only the grip is draggable: a native colour input inside a draggable element can swallow
+  // the drag or start one instead of opening the picker.
   function enableDragAndDrop(m) {
     const row = m.stopsRow;
     let dragId = null;
@@ -366,11 +372,12 @@
     };
 
     row.addEventListener("dragstart", (e) => {
-      const el = e.target.closest?.(".gpb-stop");
+      const el = e.target.closest?.(".gpb-grip")?.closest(".gpb-stop");
       if (!el) return;
       dragId = el.dataset.id;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", dragId);
+      e.dataTransfer.setDragImage(el, el.offsetWidth / 2, el.offsetHeight / 2);
       el.classList.add("gpb-dragging");
     });
     row.addEventListener("dragover", (e) => {
@@ -475,7 +482,6 @@
       const el = document.createElement("div");
       el.className = "gpb-stop";
       el.dataset.id = stop.id;
-      el.draggable = true;
       el.classList.toggle("gpb-theme", stop.kind === "theme");
       // Kept but unused while the gradient is off.
       el.classList.toggle("gpb-unused", !settings.gradient && i > 0);
@@ -483,7 +489,8 @@
         <input type="color" class="gpb-dot" aria-label="Colour ${i + 1}" title="${stop.kind === "theme" ? "Theme colour" : ""}">
         <span class="gpb-badge" aria-hidden="true">${ICON_LINK}</span>
         <button type="button" class="gpb-action gpb-link" title="Link to theme colour" aria-label="Link to theme colour">${ICON_LINK}</button>
-        ${removable ? `<button type="button" class="gpb-action gpb-remove" title="Remove colour" aria-label="Remove colour">${ICON_REMOVE}</button>` : ""}`;
+        ${removable ? `<button type="button" class="gpb-action gpb-remove" title="Remove colour" aria-label="Remove colour">${ICON_REMOVE}</button>` : ""}
+        ${removable ? `<span class="gpb-action gpb-grip" draggable="true" title="Drag to reorder" aria-hidden="true">${ICON_GRIP}</span>` : ""}`;
       el.querySelector(".gpb-dot").value = resolveStop(stop);
       row.appendChild(el);
     });
