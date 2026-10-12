@@ -21,9 +21,12 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#11](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/11) | Compatibility: Hazy theme | compatibility |
 | [#12](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/12) | Compatibility: playback-bar-waveform extension | compatibility |
 | [#13](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/13) | Marketplace packaging | packaging |
-| [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14) | v0.1.0 manual test pass | testing |
+| [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14) | v0.1.0 manual test pass (visual checklist, ≤ 8 items) | testing |
+| [#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23) | Built-in self-test: `__gpb.selfTest()` | testing |
 
-Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #11/#12 → #13 → #14.
+Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
+
+Builds are handed over as a `Test build <sha>` comment on #14: run the self-test, do the visual checklist, report back. See `CLAUDE.md → Working mode`.
 
 ## Future
 

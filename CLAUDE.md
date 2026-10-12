@@ -4,6 +4,18 @@ A Spicetify extension that recolours Spotify's **song progress bar** with one so
 
 Everything under *Verified facts* was confirmed from the live DOM (Spotify 1.3.3.264) and from the source of the theme and extension it runs alongside. Don't re-derive it and don't "improve" on it by guessing. If something depends on the live Spotify DOM and can't be known from this repo, **give the maintainer a devtools console snippet to verify it** instead of assuming.
 
+## Working mode — autonomous, test per build
+
+The maintainer has little time at the PC and wants to **bug-test finished builds, not review steps**. So:
+
+- **Work through a whole milestone (or a large batch of issues) without stopping.** Don't ask for confirmation between issues, and don't hand over per-step verification lists.
+- **Decide ambiguities yourself.** Pick the option most consistent with this file and the issues, note the decision in the relevant issue as a comment (`Decision: … because …`), and carry on. Only ask when a decision is irreversible or contradicts this file.
+- **Commit and push to `main` as you go** (one commit per issue, `Closes #n`). Never leave finished work only on the local machine.
+- **Live-DOM checks go into the self-test (#23), not into chat.** Anything you would otherwise ask the maintainer to run in devtools becomes a check inside `__gpb.selfTest()`. If something genuinely can't be automated, add it to the visual checklist in #14.
+- **One hand-off per build.** When a batch is done: push, then post a single comment on #14 titled `Test build <short-sha>` with (1) what changed, (2) "run `await __gpb.selfTest()` and paste the output", (3) the short visual checklist — only things a human must look at. Then stop and wait.
+- **Bug reports come back as issues or a pasted self-test result.** Fix everything from one report in one batch, push, post the next `Test build` comment.
+- **Things only the maintainer can do** (screenshots for `preview.png`, adding the repo topic, Marketplace submission): collect them into the `Test build` comment as a short "Needs you" list rather than asking separately.
+
 ## Project management
 
 - Work is tracked as **GitHub issues**, grouped by milestone: `v0.1.0 — MVP` and `Future`. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
@@ -176,4 +188,9 @@ Devtools must be enabled (`spicetify enable-devtools`). The maintainer's setup: 
 
 ## Testing
 
-The manual checklist lives in `README.md → Testing` and is tracked per release in #14. Add a checklist item whenever a fix addresses something the list didn't cover.
+Two layers:
+
+1. **Self-test (#23)** — `await __gpb.selfTest()` in devtools. Drives the extension programmatically, checks computed styles on the live DOM, restores the user's settings afterwards, prints a pass/fail table and copies a JSON report to the clipboard. Everything checkable by code lives here.
+2. **Visual checklist (#14)** — only what a human has to see or feel: flicker while seeking/hovering, drag-and-drop feel, colour picker opening, how it looks under the waveform and with Hazy. Keep it to ≤ 8 items.
+
+`README.md → Testing` mirrors both. Add a self-test check (preferred) or a visual item whenever a fix addresses something neither covered.

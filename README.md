@@ -68,7 +68,7 @@ See [ROADMAP.md](ROADMAP.md). Planned beyond v0.1.0: alternative gradient modes 
 
 ## Testing
 
-Manual checklist, run before each release (tracked in [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14)):
+Run `await __gpb.selfTest()` in the Spotify devtools console — it checks everything that can be checked automatically and prints a pass/fail table ([#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23)). The full list of behaviours covered, by the self-test or by eye ([#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14)):
 
 1. Fresh install → bar looks exactly as before.
 2. Solid custom colour → fill and handle change; volume bar unchanged.
