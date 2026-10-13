@@ -2,7 +2,7 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
-## v0.1.0 — MVP
+## v1.0.0 — released 2026-10-13
 
 Solid colour or a gradient that always spans bar start → playhead (Compress mode), a stop that follows the theme colour, and clean coexistence with Hazy and playback-bar-waveform.
 
@@ -21,7 +21,7 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#11](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/11) | Compatibility: Hazy theme | compatibility | ✅ |
 | [#12](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/12) | Compatibility: playback-bar-waveform extension | compatibility | ✅ |
 | [#13](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/13) | Marketplace packaging | packaging | ✅ |
-| [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14) | v0.1.0 manual test pass (visual checklist, ≤ 8 items) | testing | |
+| [#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14) | v0.1.0 manual test pass (visual checklist, ≤ 8 items) | testing | ✅ |
 | [#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23) | Built-in self-test: `__gpb.selfTest()` | testing | ✅ |
 | [#25](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/25) | Silent start-up hang; re-verify DOM on Spotify 1.3.4.258 | bug, compatibility | ✅ |
 | [#26](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/26) | Removing a colour closes the settings modal | bug, ui | ✅ |
@@ -38,7 +38,11 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 
 Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
 
-Builds are handed over as a `Test build <sha>` comment on #14: run the self-test, do the visual checklist, report back. See `CLAUDE.md → Working mode`.
+Builds were handed over as `Test build <sha>` comments on #14 (closed with the release). See `CLAUDE.md → Working mode`. Release notes: [CHANGELOG.md](CHANGELOG.md).
+
+## Next
+
+Nothing is scheduled yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) first in line. The next milestone will be cut from there.
 
 ## Future
 
@@ -56,3 +60,4 @@ Agreed ideas, not scheduled.
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | needs #15 Anchored |
 | [#24](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/24) | Keyboard reordering of colour stops | accessibility gap from #8 |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
+| [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |

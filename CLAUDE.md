@@ -18,7 +18,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 
 ## Project management
 
-- Work is tracked as **GitHub issues**, grouped by milestone: `v0.1.0 — MVP` and `Future`. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
+- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
 - Reference issues in commits (`Closes #6`), one logical change per commit where practical.
 - Ideas that come up during work but aren't in scope: open an issue in the `Future` milestone rather than implementing them.
 - Labels: `enhancement`, `ui`, `rendering`, `compatibility`, `packaging`, `testing`, `documentation`, `bug`.
@@ -129,7 +129,7 @@ const FILL   = '.x-progressBar-fillColor';
 const HANDLE = ':is([data-testid="progress-bar-handle"], .progress-bar__slider, .x-progressBar-handle)';
 ```
 
-**Gradient on — Compress mode** (v0.1.0 default: full gradient always spans bar start → playhead):
+**Gradient on — Compress mode** (the default since v1.0.0: full gradient always spans bar start → playhead):
 
 ```css
 ${SCOPE} ${FILL} {

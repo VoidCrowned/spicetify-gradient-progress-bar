@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.3.3
+// VERSION: 1.0.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.3.3";
+  const VERSION = "1.0.0";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
