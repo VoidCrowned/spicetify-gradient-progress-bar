@@ -78,7 +78,7 @@ Two layers, run before each release:
    - Theme stop: emitted as a CSS variable, follows runtime `--spice-button` changes, and the open modal's swatch follows too.
    - Switch, add, the 8-stop limit, dimmed unused stops, preview, drag reorder and reset.
    - Selection: the first dot is selected on open and after Reset; Add and Duplicate select the new dot; removing the selected dot selects its neighbour; clicking a dot moves the ring without rebuilding the dots; a drag never changes it.
-   - Inline colour picker, driven with real pointer and keyboard events: it sits between the dots and *+ Add colour*, side by side when there's room; every control is reachable (scrolled into view and hit-tested, so nothing is clipped); the square, hue bar, R/G/B and hex fields each update the colour, the dot (in place) and the bar; invalid input is flagged and ignored; *Use theme colour*.
+   - Inline colour picker, driven with real pointer and keyboard events: it sits between the dots and *+ Add colour*, side by side when there's room; every control is reachable (scrolled into view and hit-tested, so nothing is clipped); the `HEX:` row is centred with a half-width field; the square, hue bar, R/G/B and hex fields each update the colour, the dot (in place) and the bar; invalid input is flagged and ignored; *Use theme colour*.
    - Right-click menu: opens at the cursor and is reachable, Duplicate (a theme colour stays a theme colour) and Remove, both disabled states, keyboard use.
    - The settings stay open after every picker and menu action; spacing under the title and above the help text.
    - Modal clean-up: listeners and observers removed on close, no clashes with Hazy's ids and classes.

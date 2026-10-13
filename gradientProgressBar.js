@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.3.1
+// VERSION: 0.3.2
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.3.1";
+  const VERSION = "0.3.2";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -357,11 +357,11 @@
 .gpb-sv:focus-visible, .gpb-hue:focus-visible, .gpb-eyedropper:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-rgb { display: flex; gap: 8px; }
 .gpb-channel { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: .75rem; color: var(--spice-subtext); }
-.gpb-hex-row { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--spice-subtext); }
+.gpb-hex-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .75rem; color: var(--spice-subtext); }
 .gpb-field { width: 100%; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 6px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 4px; background-color: rgba(var(--spice-rgb-text), .08); color: var(--spice-text); font: inherit; font-size: .875rem; text-align: center; }
 .gpb-field:focus { outline: none; border-color: var(--spice-text); }
 .gpb-field[aria-invalid="true"] { border-color: var(--spice-notification-error, #e91429); }
-.gpb-hex { flex: 1; font-family: ui-monospace, Consolas, monospace; text-align: left; }
+.gpb-hex { flex: none; width: 10ch; font-family: ui-monospace, Consolas, monospace; text-align: left; }
 .gpb-colour-picker .gpb-button { align-self: stretch; padding: 6px 12px; font-size: .875rem; }
 `;
   // Two columns from 420 px of content (202 + 16 + 202), stacked below that. Flex-wrap rather
@@ -407,7 +407,7 @@
               `<label class="gpb-channel"><input type="text" class="gpb-field gpb-channel-input" inputmode="numeric" maxlength="3" spellcheck="false" autocomplete="off" aria-label="${name}"><span>${name[0]}</span></label>`
             ).join("")}
           </div>
-          <label class="gpb-hex-row"><span>Hex</span><input type="text" class="gpb-field gpb-hex" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Hex code"></label>
+          <label class="gpb-hex-row"><span>HEX:</span><input type="text" class="gpb-field gpb-hex" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Hex code"></label>
           <button type="button" class="gpb-button gpb-use-theme">Use theme colour</button>
         </div>
       </div>
@@ -1479,6 +1479,16 @@
     const unreachable = Object.entries(pickerControls).filter(([, el]) => !reachable(el)).map(([name]) => name);
     check(35, "Every picker control is reachable (scrolled into view, its centre hit-tests to it)", !unreachable.length,
       unreachable.length ? `not reachable: ${unreachable.join(", ")}` : `${Object.keys(pickerControls).length} controls`);
+    const hexLabel = m.root.querySelector(".gpb-hex-row > span");
+    check(36, "Hex label reads 'HEX:'", hexLabel?.textContent === "HEX:", JSON.stringify(hexLabel?.textContent ?? null));
+    const columnRect = controls.getBoundingClientRect();
+    const hexRect = m.hex.getBoundingClientRect();
+    check(36, "Hex field is at most 55 % of the right column's width", hexRect.width <= 0.55 * columnRect.width,
+      `field ${Math.round(hexRect.width)} px, column ${Math.round(columnRect.width)} px`);
+    const leftGap = hexLabel.getBoundingClientRect().left - columnRect.left;
+    const rightGap = columnRect.right - hexRect.right;
+    check(36, "Hex row is centred in the right column (gaps differ by ≤ 2 px)", Math.abs(leftGap - rightGap) <= 2,
+      `left gap ${leftGap.toFixed(1)} px, right gap ${rightGap.toFixed(1)} px`);
     check(32, "Theme stop → 'Following theme colour', disabled",
       m.useThemeButton.disabled && m.useThemeButton.textContent === "Following theme colour", m.useThemeButton.textContent);
     check(32, "Eyedropper shown exactly when window.EyeDropper exists", !!m.eyedropper === !!window.EyeDropper,
