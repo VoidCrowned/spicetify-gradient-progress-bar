@@ -51,7 +51,7 @@ Designed to sit on top of any theme without fighting it: it uses no `!important`
 
 ## Troubleshooting
 
-- **No profile-menu entry or top-bar button:** right-click the song progress bar instead. Spicetify's menu and top-bar helpers are broken on Spotify 1.3.4 / Spicetify 2.45.3 ([#27](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/27), [#28](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/28)).
+- **No profile-menu entry or top-bar button:** right-click the song progress bar instead. On Spotify 1.3.4 / Spicetify 2.45.3 the top-bar button never appears, and the profile-menu entry only appears when the extension is installed from the Marketplace, not as a local file ([#27](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/27), [#28](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/28)).
 - **After a Spotify update the bar is back to normal:** updates remove Spicetify's patch. Run `spicetify apply`, or `spicetify backup apply` if Spicetify asks for it.
 - **The bar keeps the theme colour although you set colours:** with the gradient off, only the first colour counts. If that one follows the theme, the extension deliberately leaves the bar alone. Click it and pick a colour, or switch the gradient on.
 - **Something looks wrong with your theme or another extension:** [open an issue](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/new/choose) and follow [CONTRIBUTING.md → Reporting a bug](CONTRIBUTING.md#reporting-a-bug).
