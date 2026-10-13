@@ -29,6 +29,9 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#28](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/28) | Top-bar button never renders on Spotify 1.3.4.258 — no visible way to open settings | bug, compatibility | ✅ |
 | [#30](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/30) | Hex colour field for the selected colour | ui | ✅ |
 | [#31](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/31) | Labelled actions and help text instead of tiny icons on the dots | ui | ✅ |
+| [#32](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/32) | Own colour picker on left-click, with hex field and theme button | ui | |
+| [#33](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/33) | Right-click menu on colour dots: Duplicate / Remove | ui | |
+| [#34](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/34) | Settings polish: spacing, no dashed ring, new help text | ui | |
 
 Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
 
