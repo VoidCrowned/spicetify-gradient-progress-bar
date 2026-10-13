@@ -101,6 +101,10 @@ Turns the bar into a 24 px audio waveform using **Web Animations API held animat
 
 It never touches the fill's background, so our gradient is cut into the waveform shape by the parent's mask — this is desired. Its selector constants are a good reference list of historical Spotify class names.
 
+### Spicetify PopupModal
+
+`Spicetify.PopupModal` is a custom element (`generic-modal`, `_HTMLGenericModal` in spicetifyWrapper). `display()` rebuilds its innerHTML, appends our content into its `<main>` and appends itself to `<body>`; `hide()` removes it. Its **overlay click handler hides the modal when `.GenericModal` doesn't `contains(event.target)`** — so a click whose target we detach during dispatch (e.g. re-rendering the stop that owns the clicked ✕) closes the modal. **Never remove or replace the clicked element synchronously in a click handler; defer with `setTimeout(…, 0)`** (#26).
+
 ## Hard rules
 
 1. **Scope everything** with `SCOPE` (below). The volume bar must never change.

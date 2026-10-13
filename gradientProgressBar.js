@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.1.1
+// VERSION: 0.1.2
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.1.1";
+  const VERSION = "0.1.2";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -375,8 +375,15 @@
       const action = e.target.closest(".gpb-action");
       if (!action) return;
       const id = action.closest(".gpb-stop").dataset.id;
-      if (action.classList.contains("gpb-remove")) removeStop(id);
-      else if (action.classList.contains("gpb-link")) linkStopToTheme(id);
+      const run = action.classList.contains("gpb-remove")
+        ? removeStop
+        : action.classList.contains("gpb-link")
+          ? linkStopToTheme
+          : null; // the grip only drags
+      // Deferred until the click has finished dispatching. Re-rendering detaches the clicked
+      // button mid-event, and on Spotify 1.3.4.258 the modal then closed — most likely its
+      // outside-click detection no longer finds the target inside the modal (#26).
+      if (run) setTimeout(() => run(id), 0);
     });
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
@@ -628,6 +635,7 @@
       waveform: waveformActive(),
       spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
       entry: startup.entry,
+      phase: startup.phase,
       dom: domProbe(), // includes the song bar's DOM outline, for selector fixes after Spotify updates
     };
   }
@@ -668,6 +676,9 @@
     }
 
     try {
+      // The entry point can take up to 20 s to register (profile menu, then top-bar fallback).
+      for (let waited = 0; startup.phase === "registering entry point" && waited < 21000; waited += 300) await sleep(300);
+      check(3, "Settings entry registered (profile menu or top bar)", startup.entry, `${startup.entry ?? "none"} (${startup.phase})`);
       await runChecks(check, rootStyle, restoreButton);
     } catch (e) {
       check(23, "Self-test ran to completion", false, e?.stack || e);
@@ -790,13 +801,24 @@
     update();
     const listenersBefore = songchangeCount();
     openModal();
-    const m = modal;
+    let m = modal;
     check(3, "Modal opens", m?.root.isConnected, "");
     if (!m) return;
+    // Records whether the modal survived an action; reopens it so later checks still run.
+    const stillOpen = (after) => {
+      const open = m.root.isConnected && modal === m;
+      check(26, `Modal still open after ${after}`, open, open ? "" : "modal closed itself");
+      if (!open) {
+        if (modal) closeModal(modal);
+        openModal();
+        m = modal;
+      }
+    };
 
     check(5, "One stop → switch disabled, gradient off", m.switchButton.disabled && !settings.gradient,
       `disabled ${m.switchButton.disabled}, gradient ${settings.gradient}`);
     m.addButton.click();
+    stillOpen("adding a stop");
     check(5, "Adding a 2nd stop → gradient on, switch enabled",
       settings.stops.length === 2 && settings.gradient && m.switchButton.getAttribute("aria-checked") === "true" && !m.switchButton.disabled,
       `${settings.stops.length} stops, gradient ${settings.gradient}`);
@@ -817,6 +839,8 @@
       colorInput ? "exists, but it's not ours" : "none in the document");
 
     m.stopsRow.querySelectorAll(".gpb-remove")[1].click();
+    await sleep(20); // stop actions run after the click has dispatched
+    stillOpen("removing a stop");
     check(5, "Removing back to one stop → gradient off, switch disabled",
       settings.stops.length === 1 && !settings.gradient && m.switchButton.disabled,
       `${settings.stops.length} stop(s), gradient ${settings.gradient}`);
@@ -826,7 +850,7 @@
       `${settings.stops.length} stops, disabled ${m.addButton.disabled}`);
 
     setTestSettings(false, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
-    const opacities = [...m.stopsRow.querySelectorAll(".gpb-stop")].map((el) => getComputedStyle(el).opacity);
+    const opacities = [...m.stopsRow.querySelectorAll(".gpb-stop")].map((el) => getComputedStyle(el).opacity || "1");
     check(4, "Gradient off with 3 stops → stops 2–3 at 50 % opacity", opacities.join() === "1,0.5,0.5", opacities.join(", "));
 
     setTestSettings(true, [theme("s1"), custom("s2", RED)]);
@@ -852,12 +876,18 @@
       JSON.stringify(settings.stops[0]));
 
     m.stopsRow.querySelectorAll(".gpb-link")[1].click();
+    await sleep(20);
     check(7, "'Link to theme colour' turns a custom stop into a theme stop",
       settings.stops[1].kind === "theme" && !("color" in settings.stops[1]), JSON.stringify(settings.stops[1]));
 
     setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
     const draggable = [...m.stopsRow.querySelectorAll('[draggable="true"]')];
+    stillOpen("linking a stop to the theme colour");
     const stopEls = m.stopsRow.querySelectorAll(".gpb-stop");
+    if (stopEls.length < 3) {
+      check(8, "Drag-and-drop test setup", false, `${stopEls.length} stop element(s), expected 3`);
+      return;
+    }
     const dt = new DataTransfer();
     stopEls[0].querySelector(".gpb-grip").dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
     const lastRect = stopEls[2].getBoundingClientRect();
@@ -872,6 +902,7 @@
       draggable.length === 3 && draggable.every((el) => el.classList.contains("gpb-grip")),
       draggable.map((el) => el.className).join(", "));
 
+    stillOpen("dragging a stop");
     m.root.querySelector(".gpb-reset").click();
     check(10, "Reset → defaults and an empty stylesheet",
       JSON.stringify(settings) === JSON.stringify(defaultSettings()) && styleText() === "", JSON.stringify(settings));
@@ -923,7 +954,7 @@
   // Compact outline of the song bar's DOM — enough to fix selectors after a Spotify update
   // without another round trip.
   function outline(el, depth = 0) {
-    if (!el || depth > 5) return [];
+    if (!el || depth > 7) return [];
     const testid = el.dataset?.testid ? `[data-testid="${el.dataset.testid}"]` : "";
     const cls = [...(el.classList ?? [])].map((c) => `.${c}`).join("");
     const line = `${"  ".repeat(depth)}${el.tagName.toLowerCase()}${testid}${cls}`;
