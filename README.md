@@ -41,7 +41,7 @@ To uninstall manually: `spicetify config extensions gradientProgressBar.js-` the
 
 ## Usage
 
-Open the profile menu (top right) → **Gradient progress bar**.
+**Right-click the song progress bar** to open the settings. Where your Spicetify version supports it, there's also an entry in the profile menu or a button in the top bar (on Spotify 1.3.4 both are currently broken in Spicetify, so right-click is the reliable way).
 
 - Click a colour dot to change it.
 - **+ Add colour** adds another; with two or more, gradient mode switches on.

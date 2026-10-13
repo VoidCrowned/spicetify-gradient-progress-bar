@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.1.3
+// VERSION: 0.1.4
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.1.3";
+  const VERSION = "0.1.4";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -802,6 +802,23 @@
     // ── Modal ──
     settings = defaultSettings();
     update();
+    if (fill) {
+      const others = [...document.querySelectorAll(FILL)].filter((f) => !f.matches(`${SCOPE} ${FILL}`));
+      for (const other of others) other.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+      const volumeOpened = !!modal;
+      if (modal) {
+        Spicetify.PopupModal.hide();
+        closeModal(modal);
+      }
+      fill.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+      const opened = !!modal?.root.isConnected;
+      check(28, "Right-click on the song bar opens the settings (volume bar doesn't)", opened && !volumeOpened,
+        `song ${opened}, volume ${volumeOpened}`);
+      if (modal) {
+        Spicetify.PopupModal.hide();
+        closeModal(modal);
+      }
+    }
     const listenersBefore = songchangeCount();
     openModal();
     let m = modal;
@@ -1002,31 +1019,46 @@
   const ENTRY_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M1 7h14v2H1z" opacity=".35"/><path d="M1 7h9v2H1z"/><circle cx="10" cy="8" r="2.5"/></svg>';
 
-  // Profile menu (as specified); Topbar button if the profile menu is missing or throws.
-  // On Spotify 1.3.4.258 Spicetify.Menu exists but registering an item throws (#27).
-  async function registerEntry() {
-    let menuFailed = false;
-    for (let waited = 0; waited < 20000; waited += 300) {
-      if (!menuFailed && api("Menu")?.Item) {
-        try {
-          new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal).register();
-          return "profile menu";
-        } catch (e) {
-          menuFailed = true;
-          startup.entryErrors.push(`Menu: ${e?.message || e}`);
-          console.warn("[gpb] Profile menu unavailable, using a top-bar button instead:", e);
-        }
+  // The settings always open by right-clicking the song progress bar: one delegated listener,
+  // no Spicetify UI wrappers, nothing for a Spotify update to remove. Spicetify's Menu and
+  // Topbar are tried as extras — on Spotify 1.3.4.258 the menu throws and the top-bar button
+  // silently never renders (#27, #28), so neither can be the only way in.
+  function enableBarContextMenu() {
+    document.addEventListener(
+      "contextmenu",
+      (e) => {
+        if (!e.target.closest?.(SCOPE)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!modal) openModal();
+      },
+      true
+    );
+    return "right-click on the progress bar";
+  }
+
+  // Resolves to a description of the Spicetify entry that is actually on screen, or null.
+  async function registerSpicetifyEntry() {
+    if (api("Menu")?.Item) {
+      try {
+        new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal).register();
+        return "profile menu"; // items render when the menu opens, so this can't be checked here
+      } catch (e) {
+        startup.entryErrors.push(`Menu: ${e?.message || e}`);
       }
-      if ((menuFailed || waited >= 5000) && api("Topbar")?.Button) {
-        try {
-          new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
-          return "top bar button";
-        } catch (e) {
-          startup.entryErrors.push(`Topbar: ${e?.message || e}`);
-          return null;
+    }
+    if (api("Topbar")?.Button) {
+      try {
+        const button = new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
+        for (let waited = 0; waited < 4000; waited += 250) {
+          if (button.element?.isConnected || document.querySelector(`button[aria-label="${ENTRY_LABEL}"]`))
+            return "top bar button";
+          await sleep(250);
         }
+        startup.entryErrors.push("Topbar: button created but never rendered");
+      } catch (e) {
+        startup.entryErrors.push(`Topbar: ${e?.message || e}`);
       }
-      await sleep(300);
     }
     return null;
   }
@@ -1036,16 +1068,14 @@
     settings = loadSettings();
     window.addEventListener("beforeunload", flushSettings);
     applyCss(); // the bar works even if no entry point can be registered
-    window.__gpb = { version: VERSION, status: () => statusReport(), selfTest };
+    window.__gpb = { version: VERSION, status: () => statusReport(), selfTest, open: () => modal || openModal() };
+    startup.entry = enableBarContextMenu();
     startup.phase = "registering entry point";
-    startup.entry = await registerEntry();
-    if (!startup.entry) {
-      startup.phase = "running without settings entry";
-      console.warn("[gpb] Couldn't add a menu entry: neither Spicetify.Menu nor Spicetify.Topbar is available.");
-    } else {
-      startup.phase = "ready";
-      console.log(`[gpb] v${VERSION} ready — settings in the ${startup.entry}.`);
-    }
+    const extra = await registerSpicetifyEntry();
+    if (extra) startup.entry += ` + ${extra}`;
+    startup.phase = "ready";
+    console.log(`[gpb] v${VERSION} ready — open the settings with a ${startup.entry}.`);
+    if (startup.entryErrors.length) console.warn("[gpb] Spicetify entry points unavailable:", startup.entryErrors.join("; "));
   } catch (e) {
     startup.phase = "failed";
     startup.error = e?.stack || String(e);
