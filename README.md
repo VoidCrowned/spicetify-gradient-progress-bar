@@ -70,7 +70,7 @@ See [ROADMAP.md](ROADMAP.md). Planned beyond v0.1.0: alternative gradient modes 
 
 Two layers, run before each release:
 
-1. **Self-test** ([#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23)). Run `await __gpb.selfTest()` in the Spotify devtools console. It applies test settings through the extension's own code, checks the live bar, restores your settings and prints a pass/fail table. The JSON report is copied to the clipboard. It covers:
+1. **Self-test** ([#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23)). Run `await __gpb.selfTest()` in Spotify's own devtools console. To get there, run `spicetify enable-devtools` once, then press Ctrl+Shift+I in Spotify (or use ⋯ menu → Develop → Show Chrome Tools) and open the Console tab. It applies test settings through the extension's own code, checks the live bar, restores your settings and prints a pass/fail table. The JSON report is copied to the clipboard. It covers:
    - Inert by default: empty stylesheet, bar unchanged.
    - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
    - Solid and gradient rendering: Compress-mode sizing, stop order, handle colour.
