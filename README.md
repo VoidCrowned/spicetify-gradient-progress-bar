@@ -43,10 +43,10 @@ To uninstall manually: `spicetify config extensions gradientProgressBar.js-` the
 
 **Right-click the song progress bar** to open the settings. Where your Spicetify version supports it, there's also an entry in the profile menu or a button in the top bar (on Spotify 1.3.4 both are currently broken in Spicetify, so right-click is the reliable way).
 
-- Click a colour dot to change it.
-- **+ Add colour** adds another; with two or more, gradient mode switches on.
-- Hover a dot to remove it, or to link it to your theme colour.
-- Drag a dot by its grip (top-left, shown on hover) to reorder the gradient.
+- **Click a colour dot to select it**, then change it with the colour picker or by typing or pasting a **hex code** (`#8372fd`, `8372fd` or `#87f`).
+- **Use theme colour** makes the selected colour follow your theme's accent; those dots get a dashed ring. **Remove** deletes it.
+- **+ Add colour** adds another and selects it; with two or more, gradient mode switches on.
+- **Drag the dots** to reorder the gradient.
 - **Reset** returns to the default (your theme's own colour, no gradient).
 
 ## Compatibility
@@ -81,7 +81,7 @@ Two layers, run before each release:
    - Bar size, radius and waveform masks unchanged.
 2. **Visual checklist** ([#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14)). What needs a human:
    1. Hover, click-seek and drag the bar, solid and gradient → no colour flicker; the whole gradient is visible at roughly 5 %, 50 % and 95 %.
-   2. Click a dot → the colour picker opens; drag a dot's grip → a marker shows where it lands and the order changes.
+   2. Click a dot → it's selected; the picker and hex field edit it; pasting a hex code works; drag a dot → a marker shows where it lands and the order changes.
    3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour; off → plain bar correct.
    4. Hazy with *Custom color* on → change it and Apply → the bar follows; off → the bar follows the album-art colour across songs.
    5. After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.

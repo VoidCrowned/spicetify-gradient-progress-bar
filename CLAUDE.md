@@ -166,7 +166,7 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 
 - Entry: **right-click the song progress bar** (always), plus the profile menu or a top-bar button where Spicetify can still render them (#28).
 - Gradient switch off by default; **adding a 2nd stop turns it on**; **removing to 1 stop turns it off**; **disabled with 1 stop**.
-- Native `<input type="color">` dots, round; hover actions remove / link to theme colour; drag-and-drop reorder **by a grip handle only** (a native colour input inside a draggable element can swallow the drag or start one instead of opening the picker; #8); max 8 stops; preview strip; reset with no confirmation.
+- **Dots are plain `<button>`s: click to select, drag to reorder** (HTML5 DnD on the dot itself). The selected stop is edited in one **editor row**: native `<input type="color">` picker, **hex field** (`#rrggbb`/`rrggbb`/`#rgb`, live, invalid flagged, normalised on blur), *Use theme colour*, *Remove*. No icons on the dots; theme stops get a dashed ring. Help text between *+ Add colour* and *Reset*. A new stop is selected when added (#30, #31). Max 8 stops; preview strip; reset with no confirmation. Picker and hex edits update in place — never re-render the editor while the picker is open.
 - Theme swatches kept live while the modal is open (MutationObserver on `:root` `style` + `songchange`), disconnected on close.
 - Modal colours only from Spicetify variables.
 

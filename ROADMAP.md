@@ -27,6 +27,8 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#26](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/26) | Removing a colour closes the settings modal | bug, ui | ✅ |
 | [#27](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/27) | Profile menu registration throws on Spotify 1.3.4.258 — no settings entry | bug, compatibility | ✅ |
 | [#28](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/28) | Top-bar button never renders on Spotify 1.3.4.258 — no visible way to open settings | bug, compatibility | ✅ |
+| [#30](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/30) | Hex colour field for the selected colour | ui | ✅ |
+| [#31](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/31) | Labelled actions and help text instead of tiny icons on the dots | ui | ✅ |
 
 Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
 
@@ -41,7 +43,7 @@ Agreed ideas, not scheduled.
 | [#15](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/15) | Gradient mode option: Compress / Anchored / Slide | Anchored + waveform is the likely showcase |
 | [#16](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/16) | Gradient direction / angle | |
 | [#17](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/17) | Per-stop opacity | ties into #19 |
-| [#18](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/18) | Custom stop positions | schema v2 |
+| [#18](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/18) | Custom stop positions | schema v2; requested again — drag stops along the preview strip |
 | [#19](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/19) | Hover behaviour option | |
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
 | [#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21) | Presets and import/export | |

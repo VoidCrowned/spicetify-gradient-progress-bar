@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.1.4
+// VERSION: 0.2.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.1.4";
+  const VERSION = "0.2.0";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -234,14 +234,18 @@
   function addStop() {
     if (settings.stops.length >= MAX_STOPS) return;
     const last = settings.stops[settings.stops.length - 1];
-    settings.stops.push({ id: nextStopId(), kind: "custom", color: resolveStop(last) });
+    const id = nextStopId();
+    settings.stops.push({ id, kind: "custom", color: resolveStop(last) });
     if (settings.stops.length === 2) settings.gradient = true; // a second colour implies a gradient
+    selectedId = id; // the new colour is the one you'll want to edit
     update();
   }
 
   function removeStop(id) {
     if (settings.stops.length <= 1) return;
+    const index = settings.stops.findIndex((s) => s.id === id);
     settings.stops = settings.stops.filter((s) => s.id !== id);
+    if (selectedId === id) selectedId = settings.stops[Math.min(index, settings.stops.length - 1)].id;
     if (settings.stops.length === 1) settings.gradient = false;
     update();
   }
@@ -249,6 +253,7 @@
   // No confirmation: it's quickly undone.
   function resetSettings() {
     settings = defaultSettings();
+    selectedId = settings.stops[0].id;
     update();
   }
 
@@ -258,7 +263,7 @@
     update();
   }
 
-  // Picking a colour on a theme stop turns it into a custom stop.
+  // Editing a theme stop's colour turns it into a custom stop.
   function setStopColour(id, colour) {
     const stop = findStop(id);
     stop.kind = "custom";
@@ -286,6 +291,9 @@
   // Colours come only from Spicetify variables so the modal follows any theme.
   // Never use the id "color-input" or the classes .slider/.toggle/.toggleWrapper —
   // Hazy looks them up and styles them globally.
+  //
+  // Dots are plain buttons: click to select, drag to reorder. The selected colour is edited
+  // in one editor row (picker, hex field, labelled actions) — no tiny icons on the dots (#30, #31).
 
   const MODAL_CSS = `
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; color: var(--spice-text); }
@@ -298,40 +306,50 @@
 .gpb-switch:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-switch:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-preview { height: 8px; border-radius: 4px; }
-.gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
-.gpb-stop { position: relative; width: 32px; height: 32px; }
+.gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 14px; padding: 4px; }
+.gpb-stop { position: relative; width: 32px; height: 32px; padding: 0; border: 2px solid rgba(var(--spice-rgb-text), .25); border-radius: 50%; cursor: grab; }
+.gpb-stop.gpb-theme { border-style: dashed; border-color: var(--spice-text); }
+.gpb-stop[aria-pressed="true"], .gpb-stop:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 3px; }
 .gpb-stop.gpb-unused { opacity: .5; }
 .gpb-stop.gpb-dragging { opacity: .3; }
 .gpb-marker { position: absolute; width: 2px; height: 32px; border-radius: 1px; background-color: var(--spice-button); pointer-events: none; }
-.gpb-dot { display: block; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
-.gpb-dot::-webkit-color-swatch-wrapper { padding: 0; }
-.gpb-dot::-webkit-color-swatch { border: 2px solid rgba(var(--spice-rgb-text), .2); border-radius: 50%; }
-.gpb-dot:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
-.gpb-action, .gpb-badge { position: absolute; right: -6px; display: none; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background-color: var(--spice-card); color: var(--spice-text); }
-.gpb-action { cursor: pointer; }
-.gpb-action:hover { background-color: var(--spice-button); }
-.gpb-remove { top: -6px; }
-.gpb-grip { top: -6px; right: auto; left: -6px; cursor: grab; }
-.gpb-link, .gpb-badge { bottom: -6px; }
-.gpb-badge { pointer-events: none; }
-.gpb-stop:hover .gpb-action, .gpb-stop:focus-within .gpb-action, .gpb-stop.gpb-theme .gpb-badge { display: flex; }
-.gpb-stop.gpb-theme .gpb-link { display: none; }
+.gpb-editor { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gpb-picker { flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: none; cursor: pointer; }
+.gpb-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.gpb-picker::-webkit-color-swatch { border: 2px solid rgba(var(--spice-rgb-text), .2); border-radius: 6px; }
+.gpb-picker:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-hex { width: 11ch; height: 32px; box-sizing: border-box; padding: 0 8px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 6px; background-color: rgba(var(--spice-rgb-text), .08); color: var(--spice-text); font: inherit; font-family: ui-monospace, Consolas, monospace; }
+.gpb-hex:focus { outline: none; border-color: var(--spice-text); }
+.gpb-hex[aria-invalid="true"] { border-color: #e91429; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
+.gpb-editor .gpb-button { align-self: center; padding: 6px 12px; font-size: .875rem; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-help { margin: 0; font-size: .875rem; line-height: 1.5; color: var(--spice-subtext); }
 .gpb-footer { display: flex; justify-content: flex-end; }
 `;
 
-  const ICON_REMOVE =
-    '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-  const ICON_LINK =
-    '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6.6 9.4l2.8-2.8M7.3 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8.7 11.5l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-
-  const ICON_GRIP =
-    '<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.3"/><circle cx="10" cy="4" r="1.3"/><circle cx="6" cy="8" r="1.3"/><circle cx="10" cy="8" r="1.3"/><circle cx="6" cy="12" r="1.3"/><circle cx="10" cy="12" r="1.3"/></svg>';
+  const HELP_TEXT =
+    "Click a colour to select it, then change it with the picker or a hex code. " +
+    "Drag colours to reorder them. Dashed colours follow your theme.";
 
   let modal = null; // the open modal's elements, or null
+  let selectedId = "s1";
+
+  // The selected stop; falls back to the first if the selection no longer exists.
+  function selectedStop() {
+    const stop = findStop(selectedId) ?? settings.stops[0];
+    selectedId = stop.id;
+    return stop;
+  }
+
+  // "#rrggbb", "rrggbb", "#rgb" or "rgb" → "#rrggbb", otherwise null.
+  function parseHex(value) {
+    let hex = value.trim().replace(/^#/, "");
+    if (/^[0-9a-f]{3}$/i.test(hex)) hex = [...hex].map((c) => c + c).join("");
+    return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toLowerCase()}` : null;
+  }
 
   function openModal() {
     const root = document.createElement("div");
@@ -344,7 +362,14 @@
       </div>
       <div class="gpb-preview"></div>
       <div class="gpb-stops"></div>
+      <div class="gpb-editor">
+        <input type="color" class="gpb-picker" aria-label="Pick the selected colour" title="Pick a colour">
+        <input type="text" class="gpb-hex" aria-label="Hex code of the selected colour" spellcheck="false" autocomplete="off" maxlength="7">
+        <button type="button" class="gpb-button gpb-use-theme">Use theme colour</button>
+        <button type="button" class="gpb-button gpb-remove">Remove</button>
+      </div>
       <button type="button" class="gpb-button gpb-add">+ Add colour</button>
+      <p class="gpb-help">${HELP_TEXT}</p>
       <div class="gpb-footer">
         <button type="button" class="gpb-button gpb-reset">Reset</button>
       </div>`;
@@ -355,6 +380,10 @@
       switchButton: root.querySelector(".gpb-switch"),
       preview: root.querySelector(".gpb-preview"),
       stopsRow: root.querySelector(".gpb-stops"),
+      picker: root.querySelector(".gpb-picker"),
+      hex: root.querySelector(".gpb-hex"),
+      useThemeButton: root.querySelector(".gpb-use-theme"),
+      removeButton: root.querySelector(".gpb-remove"),
       addButton: root.querySelector(".gpb-add"),
       cleanups: [],
     };
@@ -362,29 +391,23 @@
     m.switchButton.addEventListener("click", toggleGradient);
     m.addButton.addEventListener("click", addStop);
     root.querySelector(".gpb-reset").addEventListener("click", resetSettings);
-    m.stopsRow.addEventListener("input", (e) => {
-      const dot = e.target.closest(".gpb-dot");
-      if (!dot) return;
-      const el = dot.closest(".gpb-stop");
-      // Updated in place: re-rendering would close the picker.
-      el.classList.remove("gpb-theme");
-      dot.title = "";
-      setStopColour(el.dataset.id, dot.value);
-    });
     m.stopsRow.addEventListener("click", (e) => {
-      const action = e.target.closest(".gpb-action");
-      if (!action) return;
-      const id = action.closest(".gpb-stop").dataset.id;
-      const run = action.classList.contains("gpb-remove")
-        ? removeStop
-        : action.classList.contains("gpb-link")
-          ? linkStopToTheme
-          : null; // the grip only drags
-      // Deferred until the click has finished dispatching. Re-rendering detaches the clicked
-      // button mid-event, and on Spotify 1.3.4.258 the modal then closed — most likely its
-      // outside-click detection no longer finds the target inside the modal (#26).
-      if (run) setTimeout(() => run(id), 0);
+      const el = e.target.closest(".gpb-stop");
+      if (el) selectStop(el.dataset.id);
     });
+    // Picker and hex field update in place: re-rendering would close the native picker.
+    m.picker.addEventListener("input", () => editSelected(m.picker.value));
+    m.hex.addEventListener("input", () => {
+      const hex = parseHex(m.hex.value);
+      m.hex.setAttribute("aria-invalid", String(!hex && m.hex.value.trim() !== ""));
+      if (hex) editSelected(hex, { fromHex: true });
+    });
+    m.hex.addEventListener("change", () => renderEditor()); // blur / Enter: show the normalised value
+    m.hex.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") m.hex.blur();
+    });
+    m.useThemeButton.addEventListener("click", () => linkStopToTheme(selectedStop().id));
+    m.removeButton.addEventListener("click", () => removeStop(selectedStop().id));
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
     modal = m;
@@ -394,10 +417,29 @@
     enableDragAndDrop(m);
   }
 
-  const STOP_GAP = 12; // matches .gpb-stops gap
+  function selectStop(id) {
+    if (!findStop(id)) return;
+    selectedId = id;
+    for (const el of modal.stopsRow.querySelectorAll(".gpb-stop"))
+      el.setAttribute("aria-pressed", String(el.dataset.id === id));
+    renderEditor();
+  }
 
-  // Only the grip is draggable: a native colour input inside a draggable element can swallow
-  // the drag or start one instead of opening the picker.
+  // Picker or hex field changed the selected colour (a theme stop becomes custom).
+  function editSelected(colour, { fromHex = false } = {}) {
+    const stop = selectedStop();
+    setStopColour(stop.id, colour);
+    renderStop(stop);
+    if (!fromHex) {
+      modal.hex.value = colour;
+      modal.hex.setAttribute("aria-invalid", "false");
+    } else modal.picker.value = colour;
+    renderEditorButtons();
+  }
+
+  const STOP_GAP = 14; // matches .gpb-stops gap
+
+  // The dots are buttons, so dragging never fights a native colour input (#8, #31).
   function enableDragAndDrop(m) {
     const row = m.stopsRow;
     let dragId = null;
@@ -410,8 +452,8 @@
     };
 
     row.addEventListener("dragstart", (e) => {
-      const el = e.target.closest?.(".gpb-grip")?.closest(".gpb-stop");
-      if (!el) return;
+      const el = e.target.closest?.(".gpb-stop");
+      if (!el || settings.stops.length < 2) return e.preventDefault();
       dragId = el.dataset.id;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", dragId);
@@ -463,8 +505,8 @@
   // so keep the theme swatches current while the modal is open.
   function watchThemeColour(m) {
     const sync = () => {
-      const colour = resolveStop({ kind: "theme" });
-      for (const dot of m.stopsRow.querySelectorAll(".gpb-theme .gpb-dot")) dot.value = colour;
+      for (const stop of settings.stops) if (stop.kind === "theme") renderStop(stop);
+      if (selectedStop().kind === "theme") renderEditor();
     };
     modalObserver(m, sync).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     Spicetify.Player.addEventListener("songchange", sync);
@@ -506,6 +548,7 @@
     renderSwitch();
     renderPreview();
     renderStops();
+    renderEditor();
     modal.addButton.disabled = settings.stops.length >= MAX_STOPS;
   }
 
@@ -524,28 +567,55 @@
 
   function renderStops() {
     const row = modal.stopsRow;
-    const removable = settings.stops.length > 1;
+    const selected = selectedStop();
     row.textContent = "";
     settings.stops.forEach((stop, i) => {
-      const el = document.createElement("div");
+      const el = document.createElement("button");
+      el.type = "button";
       el.className = "gpb-stop";
+      el.draggable = true;
       el.dataset.id = stop.id;
-      el.classList.toggle("gpb-theme", stop.kind === "theme");
+      el.dataset.index = String(i + 1);
+      el.setAttribute("aria-pressed", String(stop.id === selected.id));
       // Kept but unused while the gradient is off.
       el.classList.toggle("gpb-unused", !settings.gradient && i > 0);
-      el.innerHTML = `
-        <input type="color" class="gpb-dot" aria-label="Colour ${i + 1}" title="${stop.kind === "theme" ? "Theme colour" : ""}">
-        <span class="gpb-badge" aria-hidden="true">${ICON_LINK}</span>
-        <button type="button" class="gpb-action gpb-link" title="Link to theme colour" aria-label="Link to theme colour">${ICON_LINK}</button>
-        ${removable ? `<button type="button" class="gpb-action gpb-remove" title="Remove colour" aria-label="Remove colour">${ICON_REMOVE}</button>` : ""}
-        ${removable ? `<span class="gpb-action gpb-grip" draggable="true" title="Drag to reorder" aria-hidden="true">${ICON_GRIP}</span>` : ""}`;
-      el.querySelector(".gpb-dot").value = resolveStop(stop);
       row.appendChild(el);
+      renderStop(stop);
     });
     const marker = document.createElement("div");
     marker.className = "gpb-marker";
     marker.hidden = true;
     row.appendChild(marker);
+  }
+
+  // Updates one dot in place.
+  function renderStop(stop) {
+    const el = modal?.stopsRow.querySelector(`.gpb-stop[data-id="${stop.id}"]`);
+    if (!el) return;
+    const colour = resolveStop(stop);
+    const isTheme = stop.kind === "theme";
+    el.style.backgroundColor = colour;
+    el.classList.toggle("gpb-theme", isTheme);
+    el.title = isTheme ? `Theme colour (${colour})` : colour;
+    el.setAttribute("aria-label", `Colour ${el.dataset.index}: ${isTheme ? "theme colour" : colour}`);
+  }
+
+  function renderEditor() {
+    const stop = selectedStop();
+    const colour = resolveStop(stop);
+    modal.picker.value = colour;
+    if (document.activeElement !== modal.hex) {
+      modal.hex.value = colour;
+      modal.hex.setAttribute("aria-invalid", "false");
+    }
+    renderEditorButtons();
+  }
+
+  function renderEditorButtons() {
+    const isTheme = selectedStop().kind === "theme";
+    modal.useThemeButton.disabled = isTheme;
+    modal.useThemeButton.textContent = isTheme ? "Following theme colour" : "Use theme colour";
+    modal.removeButton.disabled = settings.stops.length <= 1;
   }
 
   // ── Self-test ───────────────────────────────────────────────────────────────
@@ -837,6 +907,7 @@
 
     check(5, "One stop → switch disabled, gradient off", m.switchButton.disabled && !settings.gradient,
       `disabled ${m.switchButton.disabled}, gradient ${settings.gradient}`);
+    check(31, "One stop → Remove disabled", m.removeButton.disabled, `disabled ${m.removeButton.disabled}`);
     m.addButton.click();
     stillOpen("adding a stop");
     check(5, "Adding a 2nd stop → gradient on, switch enabled",
@@ -845,6 +916,9 @@
     check(4, "New stop = last stop's resolved colour",
       settings.stops[1].kind === "custom" && settings.stops[1].color === resolveStop(settings.stops[0]),
       `${settings.stops[1].color} vs ${resolveStop(settings.stops[0])}`);
+    const pressed = () => [...m.stopsRow.querySelectorAll('.gpb-stop[aria-pressed="true"]')].map((el) => el.dataset.id);
+    check(30, "A new colour is selected", pressed().join() === settings.stops[1].id && selectedStop().id === settings.stops[1].id,
+      `pressed ${pressed().join()}`);
 
     const foreign = [m.root, ...m.root.querySelectorAll("*")].filter(
       (el) => (el.id && !el.id.startsWith("gpb-")) || [...el.classList].some((c) => !c.startsWith("gpb-"))
@@ -857,9 +931,18 @@
     const colorInput = document.getElementById("color-input");
     check(3, "No id=color-input of ours (Hazy looks it up)", !colorInput || !m.root.contains(colorInput),
       colorInput ? "exists, but it's not ours" : "none in the document");
+    const help = m.root.querySelector(".gpb-help");
+    const addBtn = m.root.querySelector(".gpb-add");
+    check(31, "Help text sits between + Add colour and Reset",
+      help?.textContent.includes("Drag") && addBtn.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING &&
+        help.compareDocumentPosition(m.root.querySelector(".gpb-reset")) & Node.DOCUMENT_POSITION_FOLLOWING,
+      help?.textContent ?? "missing");
+    const icons = m.stopsRow.querySelectorAll("svg, .gpb-action, .gpb-badge, .gpb-grip");
+    check(31, "No icons on the colour dots", !icons.length, `${icons.length} found`);
 
-    m.stopsRow.querySelectorAll(".gpb-remove")[1].click();
-    await sleep(20); // stop actions run after the click has dispatched
+    m.stopsRow.querySelectorAll(".gpb-stop")[1].click();
+    m.removeButton.click();
+    await sleep(20);
     stillOpen("removing a stop");
     check(5, "Removing back to one stop → gradient off, switch disabled",
       settings.stops.length === 1 && !settings.gradient && m.switchButton.disabled,
@@ -880,47 +963,76 @@
       check(9, "Preview shows the same gradient as the bar", preview === bar, preview);
     }
 
+    const stopEl = (i) => m.stopsRow.querySelectorAll(".gpb-stop")[i];
+    stopEl(0).click(); // select the theme stop
     rootStyle.setProperty("--spice-button", PROBE, "important");
     await tick(); // let the :root MutationObserver run
-    const swatch = m.stopsRow.querySelector(".gpb-theme .gpb-dot")?.value;
+    const swatch = computedHex(stopEl(0), "backgroundColor");
+    const editorSeen = `picker ${m.picker.value}, hex ${m.hex.value}`;
+    const editorFollows = m.picker.value === PROBE && m.hex.value === PROBE;
     restoreButton();
     await tick();
-    check(11, "Open modal: theme swatch follows a runtime --spice-button change", swatch === PROBE, swatch);
+    check(11, "Open modal: theme dot and editor follow a runtime --spice-button change", swatch === PROBE && editorFollows,
+      `dot ${swatch}, ${editorSeen}`);
+    check(31, "Theme colours are shown with a dashed ring", stopEl(0).classList.contains("gpb-theme") &&
+      getComputedStyle(stopEl(0)).borderTopStyle === "dashed", getComputedStyle(stopEl(0)).borderTopStyle);
 
-    const firstStop = m.stopsRow.querySelector(".gpb-stop");
-    const dot = firstStop.querySelector(".gpb-dot");
-    dot.value = GREEN;
-    dot.dispatchEvent(new Event("input", { bubbles: true }));
-    check(7, "Picking a colour on a theme dot → custom, without re-rendering (picker stays open)",
-      settings.stops[0].kind === "custom" && settings.stops[0].color === GREEN && firstStop.isConnected && !firstStop.classList.contains("gpb-theme"),
+    const themeDot = stopEl(0);
+    m.picker.value = GREEN;
+    m.picker.dispatchEvent(new Event("input", { bubbles: true }));
+    check(7, "Picking a colour for a theme stop → custom, without re-rendering (picker stays open)",
+      settings.stops[0].kind === "custom" && settings.stops[0].color === GREEN && themeDot.isConnected &&
+        !themeDot.classList.contains("gpb-theme") && m.hex.value === GREEN,
       JSON.stringify(settings.stops[0]));
 
-    m.stopsRow.querySelectorAll(".gpb-link")[1].click();
+    stopEl(1).click();
+    check(30, "Hex field shows the selected colour", m.hex.value === RED && m.picker.value === RED, m.hex.value);
+    const typeHex = (value) => {
+      m.hex.value = value;
+      m.hex.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    typeHex("ABCDEF");
+    const afterPlain = settings.stops[1].color;
+    typeHex("#0f0");
+    const afterShort = settings.stops[1].color;
+    check(30, "Hex field accepts rrggbb and #rgb, case-insensitive, and updates bar + picker",
+      afterPlain === "#abcdef" && afterShort === "#00ff00" && m.picker.value === "#00ff00" &&
+        styleText().includes("#00ff00") && stopEl(1).isConnected,
+      `${afterPlain}, ${afterShort}, picker ${m.picker.value}`);
+    typeHex("#zz12");
+    check(30, "Invalid hex is flagged and ignored", m.hex.getAttribute("aria-invalid") === "true" && settings.stops[1].color === "#00ff00",
+      `aria-invalid ${m.hex.getAttribute("aria-invalid")}, colour ${settings.stops[1].color}`);
+    m.hex.dispatchEvent(new Event("change", { bubbles: true }));
+    check(30, "Leaving the hex field restores the normalised value", m.hex.value === "#00ff00" && m.hex.getAttribute("aria-invalid") === "false",
+      m.hex.value);
+
+    m.useThemeButton.click();
     await sleep(20);
-    check(7, "'Link to theme colour' turns a custom stop into a theme stop",
-      settings.stops[1].kind === "theme" && !("color" in settings.stops[1]), JSON.stringify(settings.stops[1]));
+    stillOpen("linking a stop to the theme colour");
+    check(31, "'Use theme colour' turns the selected stop into a theme stop",
+      settings.stops[1].kind === "theme" && !("color" in settings.stops[1]) && m.useThemeButton.disabled,
+      `${JSON.stringify(settings.stops[1])}, button "${m.useThemeButton.textContent}"`);
 
     setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
-    const draggable = [...m.stopsRow.querySelectorAll('[draggable="true"]')];
-    stillOpen("linking a stop to the theme colour");
+    const draggable = [...m.root.querySelectorAll('[draggable="true"]')];
     const stopEls = m.stopsRow.querySelectorAll(".gpb-stop");
     if (stopEls.length < 3) {
       check(8, "Drag-and-drop test setup", false, `${stopEls.length} stop element(s), expected 3`);
       return;
     }
     const dt = new DataTransfer();
-    stopEls[0].querySelector(".gpb-grip").dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+    stopEls[0].dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: dt }));
     const lastRect = stopEls[2].getBoundingClientRect();
     const at = { clientX: lastRect.right + 4, clientY: lastRect.top + lastRect.height / 2 };
     m.stopsRow.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
     const markerShown = !m.stopsRow.querySelector(".gpb-marker").hidden;
     m.stopsRow.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
     const order = settings.stops.map((s) => s.id).join();
-    check(8, "Dragging stop 1's grip past the last stop moves it to the end",
+    check(8, "Dragging stop 1 past the last stop moves it to the end",
       order === "s2,s3,s1" && markerShown, `order ${order}, marker shown ${markerShown}`);
-    check(8, "Only the grips are draggable, never the colour inputs",
-      draggable.length === 3 && draggable.every((el) => el.classList.contains("gpb-grip")),
-      draggable.map((el) => el.className).join(", "));
+    check(8, "Only the colour dots are draggable, never an input",
+      draggable.length === 3 && draggable.every((el) => el.classList.contains("gpb-stop") && el.tagName === "BUTTON"),
+      draggable.map((el) => `${el.tagName.toLowerCase()}.${el.className}`).join(", "));
 
     stillOpen("dragging a stop");
     m.root.querySelector(".gpb-reset").click();
