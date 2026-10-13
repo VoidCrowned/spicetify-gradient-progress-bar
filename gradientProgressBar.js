@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 1.0.0
+// VERSION: 1.0.1
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,10 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "1.0.0";
+  const VERSION = "1.0.1";
+  // Where this copy was loaded from: the Marketplace (jsDelivr) or the CLI (extensions/).
+  // currentScript is only set before the first await, so capture it here (#39).
+  const SOURCE = document.currentScript?.src || null;
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -1107,9 +1110,16 @@
     return [...document.querySelectorAll(`${SCOPE} .x-progressBar-sliderArea`)].some(hasMaskAnimation);
   }
 
+  // Every <script> that loads this extension. More than one means a Marketplace install and a
+  // local CLI install are both active, and the second copy fights the first (#39).
+  const loadedCopies = () =>
+    [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => /gradientProgressBar.js/i.test(src));
+
   function environment() {
     return {
       extension: VERSION,
+      source: SOURCE,
+      copies: loadedCopies(),
       spotify: Spicetify.Platform?.version ?? null,
       theme: Spicetify.Config?.current_theme ?? null,
       colourScheme: Spicetify.Config?.color_scheme ?? null,
@@ -1165,6 +1175,10 @@
       for (let waited = 0; startup.phase === "registering entry point" && waited < 21000; waited += 300) await sleep(300);
       check(3, "Settings entry registered (profile menu or top bar)", startup.entry,
         [`${startup.entry ?? "none"} (${startup.phase})`, ...startup.entryErrors, startup.error?.split("\n")[0]].filter(Boolean).join("; "));
+      check(39, "Exactly one copy of the extension is loaded", env.copies.length === 1,
+        env.copies.length === 1
+          ? env.copies[0]
+          : `${env.copies.length} copies: ${env.copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions gradientProgressBar.js-), not both.`);
       await runChecks(check, rootStyle, restoreButton);
     } catch (e) {
       check(23, "Self-test ran to completion", false, e?.stack || e);

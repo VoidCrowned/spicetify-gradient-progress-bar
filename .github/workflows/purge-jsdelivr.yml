@@ -1,0 +1,74 @@
+name: Purge jsDelivr
+
+# The Marketplace loads the extension from jsDelivr @main, which caches the branch → commit
+# resolution for hours. Purge the files it serves after every change and release, then prove
+# the CDN serves the version that was just pushed (#39).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - gradientProgressBar.js
+      - manifest.json
+      - README.md
+      - preview.png
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: purge-jsdelivr
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Purge the four files
+        env:
+          BASE: https://purge.jsdelivr.net/gh/${{ github.repository }}@main
+        run: |
+          still_throttled=()
+          for file in gradientProgressBar.js manifest.json README.md preview.png; do
+            for delay in 0 30 60 120; do
+              if [ "$delay" -gt 0 ]; then
+                echo "$file is throttled, retrying in ${delay}s"
+                sleep "$delay"
+              fi
+              json=$(curl -fsS "$BASE/$file")
+              echo "$file: $json"
+              if ! grep -Eq '"throttled":[[:space:]]*true' <<<"$json"; then
+                break
+              fi
+            done
+            if grep -Eq '"throttled":[[:space:]]*true' <<<"$json"; then
+              still_throttled+=("$file")
+            fi
+          done
+          if [ ${#still_throttled[@]} -gt 0 ]; then
+            echo "::error::Still throttled after 3 retries: ${still_throttled[*]}"
+            exit 1
+          fi
+
+      - name: Check the CDN serves the pushed version
+        env:
+          CDN: https://cdn.jsdelivr.net/gh/${{ github.repository }}@main/gradientProgressBar.js
+        run: |
+          expected=$(grep -oP 'const VERSION = "\K[^"]+' gradientProgressBar.js)
+          for attempt in 1 2; do
+            served=$(curl -fsS "$CDN" | grep -oP 'const VERSION = "\K[^"]+' || true)
+            echo "Checked out: $expected, CDN serves: ${served:-nothing}"
+            if [ "$served" = "$expected" ]; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 1 ]; then
+              echo "Mismatch, checking again in 60s"
+              sleep 60
+            fi
+          done
+          echo "::error::jsDelivr serves ${served:-no VERSION}, expected $expected"
+          exit 1

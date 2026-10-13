@@ -2,6 +2,12 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.0.1 — released 2026-10-13
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#39](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/39) | Marketplace serves stale code: jsDelivr caches `@main` | packaging | ✅ |
+
 ## v1.0.0 — released 2026-10-13
 
 Solid colour or a gradient that always spans bar start → playhead (Compress mode), a stop that follows the theme colour, and clean coexistence with Hazy and playback-bar-waveform.

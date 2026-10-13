@@ -18,7 +18,8 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 
 ## Project management
 
-- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
+- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0`, `v1.0.1` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
+- The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release. If `__gpb.version` is old after a release, run it manually: `gh workflow run purge-jsdelivr.yml`.
 - Reference issues in commits (`Closes #6`), one logical change per commit where practical.
 - Ideas that come up during work but aren't in scope: open an issue in the `Future` milestone rather than implementing them.
 - Labels: `enhancement`, `ui`, `rendering`, `compatibility`, `packaging`, `testing`, `documentation`, `bug`.
@@ -40,6 +41,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 | `CONTRIBUTING.md` | Bug reports, Windows dev setup, PR checklist, issue conventions. |
 | `.github/ISSUE_TEMPLATE/bug_report.yml` | Bug report form (theme, versions, extensions, `__gpb` JSON); `config.yml` keeps blank issues enabled. |
 | `.github/workflows/issue-hygiene.yml` | Strips generated footers, ticks boxes on close. |
+| `.github/workflows/purge-jsdelivr.yml` | Purges jsDelivr `@main` on push and release, then checks the CDN serves the new `VERSION` (#39). |
 | `ROADMAP.md` | Milestones → issues. Keep in sync. |
 | `preview.png` | Marketplace screenshot (#13). |
 
@@ -195,6 +197,7 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 - Apply the stylesheet **before** registering the entry point: the bar must work even if no menu can be added.
 - Entry points: **right-click on the song progress bar always opens the settings** (one delegated `contextmenu` listener on `document`, capture phase, `closest(SCOPE)`; no Spicetify UI wrapper involved) and `__gpb.open()`. `Spicetify.Menu.Item` and `Spicetify.Topbar.Button` are tried as extras; a top-bar button only counts once its element is actually connected. **On Spotify 1.3.4.258 / Spicetify 2.45.3 both are broken**: `Menu.register()` throws `reading 'jsx'`, and Topbar buttons silently never render (Hazy's pencil is gone too) (#27, #28). Never depend on them alone.
 - Wrap start-up in `try/catch`; on failure set `status().phase = "failed"` with the stack and `console.error` it.
+- The self-test's environment block has `source` (`document.currentScript.src`, captured before the first `await`) and `copies` (every `<script>` loading `gradientProgressBar.js`); one check requires exactly one copy (#39).
 - `status()` and the self-test report include a DOM probe with an outline of the song bar, so selector breakage after a Spotify update can be fixed from one pasted report.
 - No DOM polling for the bar.
 

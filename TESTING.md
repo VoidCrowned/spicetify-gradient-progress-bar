@@ -22,6 +22,7 @@ await __gpb.selfTest()
 It applies test settings through the extension's own code, checks computed styles on the live bar and drives the settings window with real pointer, mouse and keyboard events. Afterwards it **restores your settings**, prints a pass/fail table and **copies a JSON report to the clipboard**. Paste that report into an issue, or into the `Test build` comment it belongs to.
 
 It covers:
+- Exactly one copy of the extension is loaded, and where it came from (Marketplace via jsDelivr, or a local CLI install).
 - Inert by default: empty stylesheet, bar unchanged.
 - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
 - Solid and gradient rendering: Compress-mode sizing, stop order, handle colour.
@@ -54,6 +55,10 @@ It covers:
 - Modal clean-up: listeners and observers removed on close, no clashes with Hazy's ids and classes.
 - Settings: invalid saved settings fall back to defaults with one warning; saves are debounced and survive a save–load round trip.
 - Bar size, radius and waveform masks unchanged.
+
+## After a release
+
+Check `__gpb.version` in the console. The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release. If `__gpb.version` is old after a release, run it manually: `gh workflow run purge-jsdelivr.yml`.
 
 ## Visual checklist
 

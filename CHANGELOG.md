@@ -2,6 +2,14 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.0.1] — 2026-10-13
+
+### Fixed
+- **Marketplace installs got stale code** ([#39](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/39)). The Marketplace loads the extension from jsDelivr `@main`, which kept serving an old commit for hours after 1.0.0 was pushed. A workflow now purges jsDelivr's cache on every push and release, and checks that the CDN serves the new version.
+
+### Added
+- The self-test reports where the running copy was loaded from (`source`) and every loaded copy (`copies`), and checks that exactly one copy is loaded. A Marketplace install plus a local CLI install would otherwise both run.
+
 ## [1.0.0] — 2026-10-13
 
 First public release.
