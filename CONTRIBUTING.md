@@ -61,4 +61,4 @@ The report includes an outline of the song progress bar's DOM, so selector probl
   - tick a box as soon as its item is done;
   - a dropped or replaced item is struck through: `~~item~~ — superseded by #N`;
   - a postponed item stays unticked, gets `➜ moved to #N`, and that issue is opened or extended.
-- A workflow strips generated footers from issues and ticks the remaining boxes when an issue is closed as completed.
+- A workflow strips generated footers from issues, comments and milestones, and ticks the remaining boxes when an issue is closed as completed.
