@@ -2,7 +2,7 @@
 
 A Spicetify extension that recolours Spotify's **song progress bar** with one solid colour or a multi-stop gradient. It must coexist cleanly with themes and other extensions, because it's published to the Spicetify Marketplace — not just used on the author's setup.
 
-Everything under *Verified facts* was confirmed from the live DOM (Spotify 1.3.3.264 — **re-check against 1.3.4.258**, see #25) and from the source of the theme and extension it runs alongside. Don't re-derive it and don't "improve" on it by guessing. If something depends on the live Spotify DOM and can't be known from this repo, **give the maintainer a devtools console snippet to verify it** instead of assuming.
+Everything under *Verified facts* was confirmed from the live DOM (Spotify 1.3.3.264; rendering re-verified on **1.3.4.258** by the self-test, #25) and from the source of the theme and extension it runs alongside. Don't re-derive it and don't "improve" on it by guessing. If something depends on the live Spotify DOM and can't be known from this repo, **give the maintainer a devtools console snippet to verify it** instead of assuming.
 
 ## Working mode — autonomous, test per build
 
@@ -54,6 +54,8 @@ Song progress bar structure:
       │  └─ .x-progressBar-fillColor           ← THE FILL
       └─ [data-testid="progress-bar-handle"]   ← the knob (hashed class)
 ```
+
+1.3.4.258 adds a visually-hidden `label > input` (range input, accessibility) before `.progress-bar`, and an extra hashed `div` as the first child of `.x-progressBar-progressBarBg`. Neither affects our selectors.
 
 Spotify's own rules (relevant parts):
 
