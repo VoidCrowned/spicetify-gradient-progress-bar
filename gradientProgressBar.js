@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.2.0
+// VERSION: 0.3.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.2.0";
+  const VERSION = "0.3.0";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -305,7 +305,7 @@
   // Duplicate / Remove (#33), drag to reorder (#8). No icons on the dots (#31).
 
   const MODAL_CSS = `
-.gpb-modal { display: flex; flex-direction: column; gap: 20px; color: var(--spice-text); }
+.gpb-modal { display: flex; flex-direction: column; gap: 20px; padding-top: 20px; color: var(--spice-text); }
 .gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
 .gpb-label { font-weight: 700; }
 .gpb-switch { position: relative; flex: none; width: 40px; height: 22px; padding: 0; border: 0; border-radius: 11px; background-color: rgba(var(--spice-rgb-text), .3); cursor: pointer; transition: background-color .15s; }
@@ -317,7 +317,6 @@
 .gpb-preview { height: 8px; border-radius: 4px; }
 .gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 14px; padding: 4px; }
 .gpb-stop { position: relative; width: 32px; height: 32px; padding: 0; border: 2px solid rgba(var(--spice-rgb-text), .25); border-radius: 50%; cursor: pointer; }
-.gpb-stop.gpb-theme { border-style: dashed; border-color: var(--spice-text); }
 .gpb-stop.gpb-open, .gpb-stop:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 3px; }
 .gpb-stop.gpb-unused { opacity: .5; }
 .gpb-stop.gpb-dragging { opacity: .3; }
@@ -326,7 +325,7 @@
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
-.gpb-help { margin: 0; font-size: .875rem; line-height: 1.5; color: var(--spice-subtext); }
+.gpb-help { margin: 8px 0 0; font-size: .875rem; line-height: 1.5; color: var(--spice-subtext); }
 .gpb-footer { display: flex; justify-content: flex-end; }
 .gpb-popover { position: fixed; z-index: 10; box-sizing: border-box; border-radius: 8px; background-color: var(--spice-card); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); color: var(--spice-text); }
 .gpb-popover[hidden] { display: none; }
@@ -356,8 +355,7 @@
 `;
 
   const HELP_TEXT =
-    "Click a colour to select it, then change it with the picker or a hex code. " +
-    "Right-click it to duplicate or remove it. Drag colours to reorder them. Dashed colours follow your theme.";
+    "Click a colour to edit it, right-click it to duplicate or remove it. Drag colours to reorder them.";
 
   const EYEDROPPER_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.35 2.65a2 2 0 0 0-2.83 0L8.9 4.27l-.7-.71-1.06 1.06.7.71-5.3 5.3a1.5 1.5 0 0 0-.44 1.07L2 14l2.3-.1a1.5 1.5 0 0 0 1.07-.44l5.3-5.3.71.7 1.06-1.06-.7-.71 1.61-1.61a2 2 0 0 0 0-2.83zM4.3 12.4l-.8.04.04-.8 5.37-5.37.76.76z"/></svg>';
@@ -947,7 +945,7 @@
     const isTheme = stop.kind === "theme";
     el.style.backgroundColor = colour;
     el.classList.toggle("gpb-theme", isTheme);
-    el.title = isTheme ? `Theme colour (${colour})` : colour;
+    el.title = isTheme ? "Theme colour" : colour;
     el.setAttribute("aria-label", `Colour ${el.dataset.index}: ${isTheme ? "theme colour" : colour}`);
   }
 
@@ -1263,12 +1261,14 @@
       colorInput ? "exists, but it's not ours" : "none in the document");
     const help = m.root.querySelector(".gpb-help");
     const addBtn = m.root.querySelector(".gpb-add");
-    check(31, "Help text sits between + Add colour and Reset",
-      help?.textContent.includes("Drag") && addBtn.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING &&
+    check(34, "New help text sits between + Add colour and Reset",
+      help?.textContent === HELP_TEXT && addBtn.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING &&
         help.compareDocumentPosition(m.root.querySelector(".gpb-reset")) & Node.DOCUMENT_POSITION_FOLLOWING,
       help?.textContent ?? "missing");
     const icons = m.stopsRow.querySelectorAll("svg, .gpb-action, .gpb-badge, .gpb-grip");
     check(31, "No icons on the colour dots", !icons.length, `${icons.length} found`);
+    const editorRow = m.root.querySelectorAll('.gpb-editor, input[type="color"]');
+    check(32, "No editor row and no native colour input", !editorRow.length, `${editorRow.length} found`);
 
     // ── Dot menu (#33) ──
     const dots = () => [...m.stopsRow.querySelectorAll(".gpb-stop")];
@@ -1288,6 +1288,15 @@
     };
 
     await sleep(350); // let the modal's opening animation settle before measuring positions
+    // The title bar is Spicetify's: the outermost element whose whole text is our title.
+    const titleBar = [...(m.root.closest(".GenericModal") ?? document.body).querySelectorAll("*")].find(
+      (el) => !el.contains(m.root) && !m.root.contains(el) && el.textContent.trim() === "Gradient Progress Bar"
+    );
+    const titleGap = titleBar ? m.gradientRow.getBoundingClientRect().top - titleBar.getBoundingClientRect().bottom : NaN;
+    const helpGap = help.getBoundingClientRect().top - addBtn.getBoundingClientRect().bottom;
+    check(34, "Spacing: title bar → Gradient row and + Add colour → help text are both ≥ 16 px",
+      titleGap >= 16 && helpGap >= 16,
+      `title gap ${titleBar ? `${Math.round(titleGap)} px` : "title bar not found"}, help gap ${Math.round(helpGap)} px`);
     const cursor = rightClick(dots()[1]);
     const mr = m.menu.getBoundingClientRect();
     const near = (a, b) => Math.abs(a - b) < 1.5;
@@ -1398,8 +1407,9 @@
     await tick();
     check(11, "Open picker: theme dot and picker follow a runtime --spice-button change", swatch === PROBE && pickerSeen === PROBE,
       `dot ${swatch}, picker ${pickerSeen}`);
-    check(31, "Theme colours are shown with a dashed ring", themeDot.classList.contains("gpb-theme") &&
-      getComputedStyle(themeDot).borderTopStyle === "dashed", getComputedStyle(themeDot).borderTopStyle);
+    check(34, "Theme dots: no dashed ring, 'Theme colour' tooltip",
+      getComputedStyle(themeDot).borderTopStyle !== "dashed" && themeDot.title === "Theme colour",
+      `border ${getComputedStyle(themeDot).borderTopStyle}, title "${themeDot.title}"`);
 
     pointer(m.sv, "pointerdown", 0.9, 0.1);
     pointer(m.sv, "pointermove", 0.5, 0.5);
