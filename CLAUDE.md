@@ -2,7 +2,7 @@
 
 A Spicetify extension that recolours Spotify's **song progress bar** with one solid colour or a multi-stop gradient. It must coexist cleanly with themes and other extensions, because it's published to the Spicetify Marketplace — not just used on the author's setup.
 
-Everything under *Verified facts* was confirmed from the live DOM (Spotify 1.3.3.264) and from the source of the theme and extension it runs alongside. Don't re-derive it and don't "improve" on it by guessing. If something depends on the live Spotify DOM and can't be known from this repo, **give the maintainer a devtools console snippet to verify it** instead of assuming.
+Everything under *Verified facts* was confirmed from the live DOM (Spotify 1.3.3.264 — **re-check against 1.3.4.258**, see #25) and from the source of the theme and extension it runs alongside. Don't re-derive it and don't "improve" on it by guessing. If something depends on the live Spotify DOM and can't be known from this repo, **give the maintainer a devtools console snippet to verify it** instead of assuming.
 
 ## Working mode — autonomous, test per build
 
@@ -166,15 +166,17 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 
 ## Lifecycle
 
-```js
-(async function gpb() {
-  while (!Spicetify?.LocalStorage || !Spicetify?.Menu || !Spicetify?.PopupModal || !Spicetify?.Player)
-    await new Promise(r => setTimeout(r, 300));
-  // load settings → inject #gpb-style → register menu item
-})();
-```
+- `window.__gpb = { version, status, selfTest }` is defined on the **first line**, before any waiting, so a stuck or failed start-up is visible via `__gpb.status()`.
+- Wait only for what's required: `LocalStorage`, `PopupModal`, `Player` (warn after 10 s which ones are missing). Use `window.Spicetify?.x`, never bare `Spicetify?.x` (throws if the global doesn't exist).
+- Apply the stylesheet **before** registering the entry point: the bar must work even if no menu can be added.
+- Entry point: `Spicetify.Menu.Item` (profile menu); if it isn't available after 5 s, fall back to `Spicetify.Topbar.Button`. Record which one in `status().entry`.
+- Wrap start-up in `try/catch`; on failure set `status().phase = "failed"` with the stack and `console.error` it.
+- `status()` and the self-test report include a DOM probe with an outline of the song bar, so selector breakage after a Spotify update can be fixed from one pasted report.
+- No DOM polling for the bar.
 
-No DOM polling for the bar.
+## Spotify updates
+
+Spotify auto-updates and wipes Spicetify's patch (the maintainer's 1.3.3 → 1.3.4 update removed all extensions until `spicetify apply`/reinstall). After an update: re-verify the *Verified facts* with the DOM outline from `__gpb.status()`, update this file's version note, and fix selectors in one commit.
 
 ## Development (Windows)
 

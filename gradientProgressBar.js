@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.1.0
+// VERSION: 0.1.1
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,20 +16,51 @@
 (async function gpb() {
   "use strict";
 
-  while (!Spicetify?.LocalStorage || !Spicetify?.Menu || !Spicetify?.PopupModal || !Spicetify?.Player)
-    await new Promise((r) => setTimeout(r, 300));
+  const VERSION = "0.1.1";
 
-  const VERSION = "0.1.0";
+  // Song progress bar only — the volume slider is the same component without this test id.
+  const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
+  const FILL = ".x-progressBar-fillColor";
+  const HANDLE = ':is([data-testid="progress-bar-handle"], .progress-bar__slider, .x-progressBar-handle)';
+
+  // ── Start-up status ─────────────────────────────────────────────────────────
+  // window.__gpb exists from the first line, so a stuck or failed start-up is visible in
+  // devtools (`__gpb.status()`) instead of failing silently. Spotify updates can remove or
+  // delay Spicetify APIs and change the bar's DOM; status() reports both.
+
+  const startup = { phase: "waiting for Spicetify", waitingFor: [], entry: null, error: null, since: Date.now() };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const api = (name) => window.Spicetify?.[name];
+
+  window.__gpb = {
+    version: VERSION,
+    status: () => statusReport(),
+    selfTest: async () => {
+      console.warn(`[gpb] Not ready (${startup.phase}) — the self-test needs a started extension.`);
+      return statusReport();
+    },
+  };
+
+  // Rendering only needs storage; the modal needs PopupModal and Player; the entry point
+  // needs Menu (profile menu) or, as a fallback, Topbar.
+  const REQUIRED = ["LocalStorage", "PopupModal", "Player"];
+  let warned = false;
+  while (REQUIRED.some((name) => !api(name))) {
+    startup.waitingFor = REQUIRED.filter((name) => !api(name));
+    if (!warned && Date.now() - startup.since > 10000) {
+      warned = true;
+      console.warn(`[gpb] Still waiting for Spicetify APIs: ${startup.waitingFor.join(", ")}`);
+    }
+    await sleep(300);
+  }
+  startup.waitingFor = [];
+  startup.phase = "starting";
   const STORAGE_KEY = "gpb:settings";
   const SCHEMA_VERSION = 1;
   const MAX_STOPS = 8;
   const SAVE_DELAY = 250;
   const HEX_RE = /^#[0-9a-f]{6}$/i;
 
-  // Song progress bar only — the volume slider is the same component without this test id.
-  const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
-  const FILL = ".x-progressBar-fillColor";
-  const HANDLE = ':is([data-testid="progress-bar-handle"], .progress-bar__slider, .x-progressBar-handle)';
 
   // Never resolved to a hex, so it follows runtime theme changes (e.g. Hazy's per-song accent).
   const THEME_COLOUR = "var(--spice-button, var(--spice-text, #1db954))";
@@ -596,6 +627,8 @@
       extensions: Spicetify.Config?.extensions ?? null,
       waveform: waveformActive(),
       spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
+      entry: startup.entry,
+      dom: domProbe(), // includes the song bar's DOM outline, for selector fixes after Spotify updates
     };
   }
 
@@ -885,11 +918,89 @@
       !writtenAtOnce && JSON.stringify(reloaded) === JSON.stringify(settings), `written at once ${writtenAtOnce}`);
   }
 
+  // ── Diagnostics ─────────────────────────────────────────────────────────────
+
+  // Compact outline of the song bar's DOM — enough to fix selectors after a Spotify update
+  // without another round trip.
+  function outline(el, depth = 0) {
+    if (!el || depth > 5) return [];
+    const testid = el.dataset?.testid ? `[data-testid="${el.dataset.testid}"]` : "";
+    const cls = [...(el.classList ?? [])].map((c) => `.${c}`).join("");
+    const line = `${"  ".repeat(depth)}${el.tagName.toLowerCase()}${testid}${cls}`;
+    return [line, ...[...el.children].flatMap((c) => outline(c, depth + 1))];
+  }
+
+  function domProbe() {
+    const all = (sel) => document.querySelectorAll(sel).length;
+    const wrapper =
+      document.querySelector(SCOPE) ??
+      document.querySelector('[data-testid="progress-bar"]')?.closest('[class*="playback"], [data-testid]')?.parentElement;
+    return {
+      scope: all(SCOPE),
+      fill: all(`${SCOPE} ${FILL}`),
+      handle: all(`${SCOPE} ${HANDLE}`),
+      progressBars: all(".progress-bar, [data-testid='progress-bar']"),
+      fillsAnywhere: all(FILL),
+      songBarOutline: outline(wrapper).join("\n") || "no progress bar found",
+    };
+  }
+
+  function statusReport() {
+    const report = {
+      version: VERSION,
+      phase: startup.phase,
+      waitingFor: startup.waitingFor,
+      entry: startup.entry,
+      error: startup.error,
+      spotify: window.Spicetify?.Platform?.version ?? null,
+      apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar"].map((n) => [n, !!api(n)])),
+      page: location.href,
+      dom: domProbe(),
+    };
+    console.log(`[gpb] ${report.phase}${report.entry ? `, entry: ${report.entry}` : ""}`);
+    return report;
+  }
+
   // ── Start-up ────────────────────────────────────────────────────────────────
 
-  let settings = loadSettings();
-  window.addEventListener("beforeunload", flushSettings);
-  applyCss();
-  new Spicetify.Menu.Item("Gradient progress bar", false, openModal).register();
-  window.__gpb = { selfTest, version: VERSION };
+  const ENTRY_LABEL = "Gradient progress bar";
+  const ENTRY_ICON =
+    '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M1 7h14v2H1z" opacity=".35"/><path d="M1 7h9v2H1z"/><circle cx="10" cy="8" r="2.5"/></svg>';
+
+  // Profile menu (as specified); Topbar button if Spotify's profile menu isn't hookable.
+  async function registerEntry() {
+    for (let waited = 0; waited < 20000; waited += 300) {
+      if (api("Menu")?.Item) {
+        new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal).register();
+        return "profile menu";
+      }
+      if (waited >= 5000 && api("Topbar")?.Button) {
+        new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
+        return "top bar button";
+      }
+      await sleep(300);
+    }
+    return null;
+  }
+
+  let settings;
+  try {
+    settings = loadSettings();
+    window.addEventListener("beforeunload", flushSettings);
+    applyCss(); // the bar works even if no entry point can be registered
+    window.__gpb = { version: VERSION, status: () => statusReport(), selfTest };
+    startup.phase = "registering entry point";
+    startup.entry = await registerEntry();
+    if (!startup.entry) {
+      startup.phase = "running without settings entry";
+      console.warn("[gpb] Couldn't add a menu entry: neither Spicetify.Menu nor Spicetify.Topbar is available.");
+    } else {
+      startup.phase = "ready";
+      console.log(`[gpb] v${VERSION} ready — settings in the ${startup.entry}.`);
+    }
+  } catch (e) {
+    startup.phase = "failed";
+    startup.error = e?.stack || String(e);
+    console.error("[gpb] Start-up failed:", e);
+  }
 })();
