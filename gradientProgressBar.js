@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.1.2
+// VERSION: 0.1.3
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.1.2";
+  const VERSION = "0.1.3";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -28,7 +28,7 @@
   // devtools (`__gpb.status()`) instead of failing silently. Spotify updates can remove or
   // delay Spicetify APIs and change the bar's DOM; status() reports both.
 
-  const startup = { phase: "waiting for Spicetify", waitingFor: [], entry: null, error: null, since: Date.now() };
+  const startup = { phase: "waiting for Spicetify", waitingFor: [], entry: null, entryErrors: [], error: null, since: Date.now() };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const api = (name) => window.Spicetify?.[name];
 
@@ -636,6 +636,8 @@
       spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
       entry: startup.entry,
       phase: startup.phase,
+      entryErrors: startup.entryErrors,
+      startupError: startup.error,
       dom: domProbe(), // includes the song bar's DOM outline, for selector fixes after Spotify updates
     };
   }
@@ -678,7 +680,8 @@
     try {
       // The entry point can take up to 20 s to register (profile menu, then top-bar fallback).
       for (let waited = 0; startup.phase === "registering entry point" && waited < 21000; waited += 300) await sleep(300);
-      check(3, "Settings entry registered (profile menu or top bar)", startup.entry, `${startup.entry ?? "none"} (${startup.phase})`);
+      check(3, "Settings entry registered (profile menu or top bar)", startup.entry,
+        [`${startup.entry ?? "none"} (${startup.phase})`, ...startup.entryErrors, startup.error?.split("\n")[0]].filter(Boolean).join("; "));
       await runChecks(check, rootStyle, restoreButton);
     } catch (e) {
       check(23, "Self-test ran to completion", false, e?.stack || e);
@@ -982,6 +985,7 @@
       phase: startup.phase,
       waitingFor: startup.waitingFor,
       entry: startup.entry,
+      entryErrors: startup.entryErrors,
       error: startup.error,
       spotify: window.Spicetify?.Platform?.version ?? null,
       apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar"].map((n) => [n, !!api(n)])),
@@ -998,16 +1002,29 @@
   const ENTRY_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M1 7h14v2H1z" opacity=".35"/><path d="M1 7h9v2H1z"/><circle cx="10" cy="8" r="2.5"/></svg>';
 
-  // Profile menu (as specified); Topbar button if Spotify's profile menu isn't hookable.
+  // Profile menu (as specified); Topbar button if the profile menu is missing or throws.
+  // On Spotify 1.3.4.258 Spicetify.Menu exists but registering an item throws (#27).
   async function registerEntry() {
+    let menuFailed = false;
     for (let waited = 0; waited < 20000; waited += 300) {
-      if (api("Menu")?.Item) {
-        new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal).register();
-        return "profile menu";
+      if (!menuFailed && api("Menu")?.Item) {
+        try {
+          new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal).register();
+          return "profile menu";
+        } catch (e) {
+          menuFailed = true;
+          startup.entryErrors.push(`Menu: ${e?.message || e}`);
+          console.warn("[gpb] Profile menu unavailable, using a top-bar button instead:", e);
+        }
       }
-      if (waited >= 5000 && api("Topbar")?.Button) {
-        new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
-        return "top bar button";
+      if ((menuFailed || waited >= 5000) && api("Topbar")?.Button) {
+        try {
+          new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
+          return "top bar button";
+        } catch (e) {
+          startup.entryErrors.push(`Topbar: ${e?.message || e}`);
+          return null;
+        }
       }
       await sleep(300);
     }

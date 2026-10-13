@@ -164,7 +164,7 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 
 ## UI behaviour — #3–#5, #7–#10
 
-- Entry: profile-menu item → `Spicetify.PopupModal`.
+- Entry: profile-menu item → `Spicetify.PopupModal`; top-bar button where the profile menu can't be hooked (Spotify 1.3.4.258, #27).
 - Gradient switch off by default; **adding a 2nd stop turns it on**; **removing to 1 stop turns it off**; **disabled with 1 stop**.
 - Native `<input type="color">` dots, round; hover actions remove / link to theme colour; drag-and-drop reorder **by a grip handle only** (a native colour input inside a draggable element can swallow the drag or start one instead of opening the picker; #8); max 8 stops; preview strip; reset with no confirmation.
 - Theme swatches kept live while the modal is open (MutationObserver on `:root` `style` + `songchange`), disconnected on close.
@@ -175,7 +175,7 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 - `window.__gpb = { version, status, selfTest }` is defined on the **first line**, before any waiting, so a stuck or failed start-up is visible via `__gpb.status()`.
 - Wait only for what's required: `LocalStorage`, `PopupModal`, `Player` (warn after 10 s which ones are missing). Use `window.Spicetify?.x`, never bare `Spicetify?.x` (throws if the global doesn't exist).
 - Apply the stylesheet **before** registering the entry point: the bar must work even if no menu can be added.
-- Entry point: `Spicetify.Menu.Item` (profile menu); if it isn't available after 5 s, fall back to `Spicetify.Topbar.Button`. Record which one in `status().entry`.
+- Entry point: `Spicetify.Menu.Item` (profile menu); if it **throws** or isn't available after 5 s, fall back to `Spicetify.Topbar.Button`. Record which one in `status().entry` and any errors in `status().entryErrors`. **On Spotify 1.3.4.258, `Spicetify.Menu` exists but `register()` throws** — the top-bar button is what users actually get there (#27).
 - Wrap start-up in `try/catch`; on failure set `status().phase = "failed"` with the stack and `console.error` it.
 - `status()` and the self-test report include a DOM probe with an outline of the song bar, so selector breakage after a Spotify update can be fixed from one pasted report.
 - No DOM polling for the bar.
