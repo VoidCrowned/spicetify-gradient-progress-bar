@@ -241,6 +241,17 @@
     update();
   }
 
+  // Inserts a copy directly after the stop (a theme stop stays a theme stop). Returns the copy's id.
+  function duplicateStop(id) {
+    const index = settings.stops.findIndex((s) => s.id === id);
+    if (index === -1 || settings.stops.length >= MAX_STOPS) return id;
+    const copy = { ...settings.stops[index], id: nextStopId() };
+    settings.stops.splice(index + 1, 0, copy);
+    if (settings.stops.length === 2) settings.gradient = true; // same rule as adding
+    update();
+    return copy.id;
+  }
+
   function removeStop(id) {
     if (settings.stops.length <= 1) return;
     const index = settings.stops.findIndex((s) => s.id === id);
@@ -328,11 +339,18 @@
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-help { margin: 0; font-size: .875rem; line-height: 1.5; color: var(--spice-subtext); }
 .gpb-footer { display: flex; justify-content: flex-end; }
+.gpb-stop.gpb-open { outline: 2px solid var(--spice-text); outline-offset: 3px; }
+.gpb-popover { position: fixed; z-index: 10; box-sizing: border-box; border-radius: 8px; background-color: var(--spice-card); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); color: var(--spice-text); }
+.gpb-popover[hidden] { display: none; }
+.gpb-menu { display: flex; flex-direction: column; min-width: 140px; padding: 4px; }
+.gpb-menu-item { padding: 8px 12px; border: 0; border-radius: 4px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; text-align: left; cursor: pointer; }
+.gpb-menu-item:hover:not(:disabled), .gpb-menu-item:focus-visible { outline: none; background-color: rgba(var(--spice-rgb-text), .1); }
+.gpb-menu-item:disabled { opacity: .5; cursor: default; }
 `;
 
   const HELP_TEXT =
     "Click a colour to select it, then change it with the picker or a hex code. " +
-    "Drag colours to reorder them. Dashed colours follow your theme.";
+    "Right-click it to duplicate or remove it. Drag colours to reorder them. Dashed colours follow your theme.";
 
   let modal = null; // the open modal's elements, or null
   let selectedId = "s1";
@@ -366,12 +384,15 @@
         <input type="color" class="gpb-picker" aria-label="Pick the selected colour" title="Pick a colour">
         <input type="text" class="gpb-hex" aria-label="Hex code of the selected colour" spellcheck="false" autocomplete="off" maxlength="7">
         <button type="button" class="gpb-button gpb-use-theme">Use theme colour</button>
-        <button type="button" class="gpb-button gpb-remove">Remove</button>
       </div>
       <button type="button" class="gpb-button gpb-add">+ Add colour</button>
       <p class="gpb-help">${HELP_TEXT}</p>
       <div class="gpb-footer">
         <button type="button" class="gpb-button gpb-reset">Reset</button>
+      </div>
+      <div class="gpb-popover gpb-menu" role="menu" aria-label="Colour actions" hidden>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-duplicate">Duplicate</button>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-remove">Remove</button>
       </div>`;
 
     const m = {
@@ -383,8 +404,10 @@
       picker: root.querySelector(".gpb-picker"),
       hex: root.querySelector(".gpb-hex"),
       useThemeButton: root.querySelector(".gpb-use-theme"),
-      removeButton: root.querySelector(".gpb-remove"),
       addButton: root.querySelector(".gpb-add"),
+      menu: root.querySelector(".gpb-menu"),
+      duplicateItem: root.querySelector(".gpb-duplicate"),
+      removeItem: root.querySelector(".gpb-remove"),
       cleanups: [],
     };
 
@@ -407,14 +430,161 @@
       if (e.key === "Enter") m.hex.blur();
     });
     m.useThemeButton.addEventListener("click", () => linkStopToTheme(selectedStop().id));
-    m.removeButton.addEventListener("click", () => removeStop(selectedStop().id));
+    enableDotMenu(m);
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
     modal = m;
     renderModal();
     watchModalClose(m);
     watchThemeColour(m);
+    watchPopovers(m);
     enableDragAndDrop(m);
+  }
+
+  // ── Popovers: dot menu ──
+  // Rendered inside the modal root: Spicetify's PopupModal hides itself when a click lands
+  // outside .GenericModal (#26). Popovers are shown and hidden, never removed while the modal
+  // is open, so a click is never dispatched to a detached element. One open at a time.
+
+  let popover = null; // { kind, id, el, anchor, at, openedAt } or null
+  const POPOVER_EDGE = 8; // min distance from the window edge
+  const POPOVER_GAP = 8; // between a dot and a popover anchored to it
+
+  function dotEl(id) {
+    return modal?.stopsRow.querySelector(`.gpb-stop[data-id="${CSS.escape(id)}"]`) ?? null;
+  }
+
+  // `at` is a viewport point (menu at the cursor); without it the popover sits under the dot.
+  function showPopover(kind, id, el, at = null) {
+    closePopover();
+    const anchor = dotEl(id);
+    if (!anchor) return false;
+    popover = { kind, id, el, anchor, at, openedAt: performance.now() };
+    el.hidden = false;
+    placePopover();
+    anchor.classList.add("gpb-open");
+    anchor.setAttribute("aria-expanded", "true");
+    return true;
+  }
+
+  function closePopover({ focusDot = false } = {}) {
+    if (!popover) return;
+    const { el, anchor } = popover;
+    popover = null;
+    el.hidden = true; // hidden, not removed: it may contain the element being clicked (#26)
+    anchor.classList.remove("gpb-open");
+    anchor.setAttribute("aria-expanded", "false");
+    if (focusDot && anchor.isConnected) anchor.focus({ preventScroll: true });
+  }
+
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+
+  // position: fixed escapes the modal's overflow clipping. A transformed ancestor would make
+  // it relative to that ancestor instead of the window; measuring at 0,0 finds the offset.
+  function placePopover() {
+    const { el, anchor, at } = popover;
+    el.style.left = el.style.top = "0px";
+    const origin = el.getBoundingClientRect();
+    const { width, height } = origin;
+    let left, top;
+    if (at) {
+      left = at.x + width > innerWidth - POPOVER_EDGE ? at.x - width : at.x;
+      top = at.y + height > innerHeight - POPOVER_EDGE ? at.y - height : at.y;
+    } else {
+      const r = anchor.getBoundingClientRect();
+      left = r.left + r.width / 2 - width / 2;
+      top = r.bottom + POPOVER_GAP;
+      // Flip above the dot if it doesn't fit below but does above.
+      if (top + height > innerHeight - POPOVER_EDGE && r.top - POPOVER_GAP - height >= POPOVER_EDGE)
+        top = r.top - POPOVER_GAP - height;
+    }
+    left = clamp(left, POPOVER_EDGE, innerWidth - POPOVER_EDGE - width);
+    top = clamp(top, POPOVER_EDGE, innerHeight - POPOVER_EDGE - height);
+    el.style.left = `${left - origin.left}px`;
+    el.style.top = `${top - origin.top}px`;
+  }
+
+  // Escape, or a click or focus anywhere outside the open popover, closes it. Listeners live
+  // only while the modal is open.
+  function watchPopovers(m) {
+    const listen = (target, type, handler) => {
+      target.addEventListener(type, handler, true);
+      m.cleanups.push(() => target.removeEventListener(type, handler, true));
+    };
+    // Clicking the picker's own dot toggles it in the dot's click handler instead.
+    const outside = (target) =>
+      popover && !popover.el.contains(target) && !(popover.kind === "picker" && popover.anchor.contains(target));
+    listen(document, "pointerdown", (e) => outside(e.target) && closePopover());
+    listen(document, "focusin", (e) => outside(e.target) && closePopover());
+    listen(document, "keydown", (e) => {
+      if (!popover || e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation(); // the popover closes, not the modal
+      closePopover({ focusDot: true });
+    });
+    listen(window, "resize", () => closePopover());
+    listen(document, "scroll", () => popover && (popover.kind === "menu" ? closePopover() : placePopover()));
+  }
+
+  // Right-click (or the context-menu key / Shift+F10) on a dot: Duplicate, Remove (#33).
+  function enableDotMenu(m) {
+    m.stopsRow.addEventListener("contextmenu", (e) => {
+      const el = e.target.closest(".gpb-stop");
+      if (!el) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = el.dataset.id;
+      // Shift+F10 / the menu key already opened it from keydown.
+      if (popover?.kind === "menu" && popover.id === id && performance.now() - popover.openedAt < 500) return;
+      // A keyboard-triggered contextmenu has no pointer position on the dot.
+      const r = el.getBoundingClientRect();
+      const onDot = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      openMenu(id, onDot ? { at: { x: e.clientX, y: e.clientY } } : { keyboard: true });
+    });
+    m.stopsRow.addEventListener("keydown", (e) => {
+      const el = e.target.closest(".gpb-stop");
+      if (!el || !(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) return;
+      e.preventDefault();
+      openMenu(el.dataset.id, { keyboard: true });
+    });
+    m.menu.addEventListener("keydown", (e) => {
+      const items = menuItems();
+      const i = items.indexOf(document.activeElement);
+      const next = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+      if (next !== undefined) {
+        e.preventDefault();
+        items[(next + items.length) % items.length]?.focus();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        closePopover({ focusDot: true });
+      }
+    });
+    m.duplicateItem.addEventListener("click", () => runMenuAction(duplicateStop));
+    m.removeItem.addEventListener("click", () =>
+      runMenuAction((id) => {
+        const index = settings.stops.findIndex((s) => s.id === id);
+        removeStop(id);
+        return settings.stops[Math.min(index, settings.stops.length - 1)].id;
+      })
+    );
+  }
+
+  const menuItems = () => [...modal.menu.querySelectorAll(".gpb-menu-item:not(:disabled)")];
+
+  function openMenu(id, { at = null, keyboard = false } = {}) {
+    modal.duplicateItem.disabled = settings.stops.length >= MAX_STOPS;
+    modal.removeItem.disabled = settings.stops.length <= 1;
+    if (showPopover("menu", id, modal.menu, at) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
+  }
+
+  // Hides the menu first, then acts: the clicked item stays connected, so the modal stays
+  // open (#26). `action(id)` returns the id of the dot that should get focus afterwards.
+  function runMenuAction(action) {
+    if (popover?.kind !== "menu") return;
+    const { id } = popover;
+    closePopover();
+    const focusId = action(id);
+    dotEl(focusId)?.focus({ preventScroll: true });
   }
 
   function selectStop(id) {
@@ -454,6 +624,7 @@
     row.addEventListener("dragstart", (e) => {
       const el = e.target.closest?.(".gpb-stop");
       if (!el || settings.stops.length < 2) return e.preventDefault();
+      closePopover();
       dragId = el.dataset.id;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", dragId);
@@ -545,6 +716,7 @@
   }
 
   function renderModal() {
+    closePopover(); // the dots are rebuilt, so a popover would lose its anchor
     renderSwitch();
     renderPreview();
     renderStops();
@@ -577,6 +749,8 @@
       el.dataset.id = stop.id;
       el.dataset.index = String(i + 1);
       el.setAttribute("aria-pressed", String(stop.id === selected.id));
+      el.setAttribute("aria-haspopup", "menu");
+      el.setAttribute("aria-expanded", "false");
       // Kept but unused while the gradient is off.
       el.classList.toggle("gpb-unused", !settings.gradient && i > 0);
       row.appendChild(el);
@@ -615,7 +789,6 @@
     const isTheme = selectedStop().kind === "theme";
     modal.useThemeButton.disabled = isTheme;
     modal.useThemeButton.textContent = isTheme ? "Following theme colour" : "Use theme colour";
-    modal.removeButton.disabled = settings.stops.length <= 1;
   }
 
   // ── Self-test ───────────────────────────────────────────────────────────────
@@ -907,7 +1080,6 @@
 
     check(5, "One stop → switch disabled, gradient off", m.switchButton.disabled && !settings.gradient,
       `disabled ${m.switchButton.disabled}, gradient ${settings.gradient}`);
-    check(31, "One stop → Remove disabled", m.removeButton.disabled, `disabled ${m.removeButton.disabled}`);
     m.addButton.click();
     stillOpen("adding a stop");
     check(5, "Adding a 2nd stop → gradient on, switch enabled",
@@ -940,17 +1112,82 @@
     const icons = m.stopsRow.querySelectorAll("svg, .gpb-action, .gpb-badge, .gpb-grip");
     check(31, "No icons on the colour dots", !icons.length, `${icons.length} found`);
 
-    m.stopsRow.querySelectorAll(".gpb-stop")[1].click();
-    m.removeButton.click();
+    // ── Dot menu (#33) ──
+    const dots = () => [...m.stopsRow.querySelectorAll(".gpb-stop")];
+    const menuShown = () => !m.menu.hidden && popover?.kind === "menu" && m.root.contains(m.menu);
+    const rightClick = (el) => {
+      const r = el.getBoundingClientRect();
+      const at = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: at.x, clientY: at.y }));
+      return at;
+    };
+    const press = (el, key, init = {}) =>
+      el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }));
+    // The element's centre hit-tests to something inside `container`: visible, not clipped or covered.
+    const hitsInside = (container, el) => {
+      const r = el.getBoundingClientRect();
+      return container.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    };
+
+    await sleep(350); // let the modal's opening animation settle before measuring positions
+    const cursor = rightClick(dots()[1]);
+    const mr = m.menu.getBoundingClientRect();
+    const near = (a, b) => Math.abs(a - b) < 1.5;
+    const atCursor = (near(mr.left, cursor.x) || near(mr.right, cursor.x)) && (near(mr.top, cursor.y) || near(mr.bottom, cursor.y));
+    check(33, "Right-click on a dot opens the menu inside the modal root, at the cursor", menuShown() && atCursor,
+      `shown ${menuShown()}, menu ${Math.round(mr.left)},${Math.round(mr.top)}, cursor ${Math.round(cursor.x)},${Math.round(cursor.y)}`);
+    check(33, "Menu is visible on top (not clipped by the modal)", hitsInside(m.menu, m.removeItem), "");
+    m.removeItem.click();
     await sleep(20);
-    stillOpen("removing a stop");
-    check(5, "Removing back to one stop → gradient off, switch disabled",
-      settings.stops.length === 1 && !settings.gradient && m.switchButton.disabled,
+    stillOpen("Remove in the dot menu");
+    check(5, "Remove down to one stop → gradient off, switch disabled, menu closed",
+      settings.stops.length === 1 && !settings.gradient && m.switchButton.disabled && !menuShown(),
       `${settings.stops.length} stop(s), gradient ${settings.gradient}`);
+
+    rightClick(dots()[0]);
+    check(33, "One stop → Remove disabled, Duplicate enabled", m.removeItem.disabled && !m.duplicateItem.disabled,
+      `remove disabled ${m.removeItem.disabled}, duplicate disabled ${m.duplicateItem.disabled}`);
+    const original = { ...settings.stops[0] };
+    m.duplicateItem.click();
+    await sleep(20);
+    stillOpen("Duplicate in the dot menu");
+    check(33, "Duplicate from one stop → identical copy after it, gradient on",
+      settings.stops.length === 2 && settings.gradient && settings.stops[1].kind === original.kind &&
+        settings.stops[1].color === original.color && settings.stops[0].id === original.id,
+      JSON.stringify(settings.stops));
+
+    setTestSettings(true, [theme("s1"), custom("s2", RED)]);
+    rightClick(dots()[0]);
+    m.duplicateItem.click();
+    await sleep(20);
+    stillOpen("duplicating a theme stop");
+    check(33, "Duplicating a theme stop inserts a theme stop directly after it",
+      settings.stops.map((s) => `${s.id}:${s.kind}`).join() === "s1:theme,s3:theme,s2:custom",
+      settings.stops.map((s) => `${s.id}:${s.kind}`).join());
+
+    dots()[0].focus();
+    press(dots()[0], "F10", { shiftKey: true });
+    const items = [m.duplicateItem, m.removeItem];
+    const firstFocused = menuShown() && document.activeElement === items[0];
+    press(document.activeElement, "ArrowDown");
+    const secondFocused = document.activeElement === items[1];
+    press(document.activeElement, "Escape");
+    check(33, "Keyboard: Shift+F10 opens the menu, arrows move, Escape closes and refocuses the dot",
+      firstFocused && secondFocused && !menuShown() && document.activeElement === dots()[0],
+      `first ${firstFocused}, arrow ${secondFocused}, closed ${!menuShown()}, focus ${document.activeElement?.className}`);
+    stillOpen("Escape in the dot menu");
+
+    rightClick(dots()[0]);
+    m.gradientRow.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    check(33, "A click elsewhere in the modal closes the menu", !menuShown(), "");
+    stillOpen("clicking away from the dot menu");
 
     for (let i = 0; i < MAX_STOPS + 2; i++) m.addButton.click();
     check(4, "Add stops at 8, button disabled", settings.stops.length === MAX_STOPS && m.addButton.disabled,
       `${settings.stops.length} stops, disabled ${m.addButton.disabled}`);
+    rightClick(dots()[0]);
+    check(33, "Eight stops → Duplicate disabled", m.duplicateItem.disabled, `disabled ${m.duplicateItem.disabled}`);
+    closePopover();
 
     setTestSettings(false, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
     const opacities = [...m.stopsRow.querySelectorAll(".gpb-stop")].map((el) => getComputedStyle(el).opacity || "1");
