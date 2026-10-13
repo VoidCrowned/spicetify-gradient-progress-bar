@@ -32,6 +32,7 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#32](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/32) | Own colour picker on left-click, with hex field and theme button | ui | ✅ |
 | [#33](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/33) | Right-click menu on colour dots: Duplicate / Remove | ui | ✅ |
 | [#34](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/34) | Settings polish: spacing, no dashed ring, new help text | ui | ✅ |
+| [#35](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/35) | Picker is clipped by the settings window — move it inline | bug, ui, compatibility | ✅ |
 
 Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
 

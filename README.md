@@ -43,10 +43,10 @@ To uninstall manually: `spicetify config extensions gradientProgressBar.js-` the
 
 **Right-click the song progress bar** to open the settings. Where your Spicetify version supports it, there's also an entry in the profile menu or a button in the top bar (on Spotify 1.3.4 both are currently broken in Spicetify, so right-click is the reliable way).
 
-- **Click a colour dot** to open its colour picker: drag in the square and the hue bar, use the eyedropper (where available), or type R/G/B values or a **hex code** (`#8372fd`, `8372fd` or `#87f`). Changes show on the bar as you go. Escape or a click elsewhere closes it.
-- **Use theme colour** in the picker makes that colour follow your theme's accent; the button then reads *Following theme colour*. Hover a dot to see whether it's a theme colour.
+- **Click a colour dot** to select it (it gets a ring) and edit it in the colour picker below the dots: drag in the square and the hue bar, use the eyedropper (where available), or type R/G/B values or a **hex code** (`#8372fd`, `8372fd` or `#87f`). Changes show on the bar as you go. With the keyboard, Enter or Space on a dot selects it and jumps to the hex field.
+- **Use theme colour** in the picker makes the selected colour follow your theme's accent; the button then reads *Following theme colour*. Hover a dot to see whether it's a theme colour.
 - **Right-click a dot** for **Duplicate** and **Remove** (also with the context-menu key or Shift+F10).
-- **+ Add colour** adds another; with two or more, gradient mode switches on.
+- **+ Add colour** adds another and selects it; with two or more, gradient mode switches on.
 - **Drag the dots** to reorder the gradient.
 - **Reset** returns to the default (your theme's own colour, no gradient).
 
@@ -77,15 +77,16 @@ Two layers, run before each release:
    - Solid and gradient rendering: Compress-mode sizing, stop order, handle colour.
    - Theme stop: emitted as a CSS variable, follows runtime `--spice-button` changes, and the open modal's swatch follows too.
    - Switch, add, the 8-stop limit, dimmed unused stops, preview, drag reorder and reset.
-   - Colour picker, driven with real pointer and keyboard events: it opens inside the settings under its dot; the square, hue bar, R/G/B and hex fields each update the colour, the dot (in place) and the bar; invalid input is flagged and ignored; *Use theme colour*; Escape, a click elsewhere and the same dot close it; a drag never opens it.
-   - Right-click menu: opens at the cursor, Duplicate (a theme colour stays a theme colour) and Remove, both disabled states, keyboard use; only one of picker and menu open at a time.
+   - Selection: the first dot is selected on open and after Reset; Add and Duplicate select the new dot; removing the selected dot selects its neighbour; clicking a dot moves the ring without rebuilding the dots; a drag never changes it.
+   - Inline colour picker, driven with real pointer and keyboard events: it sits between the dots and *+ Add colour*, side by side when there's room; every control is reachable (scrolled into view and hit-tested, so nothing is clipped); the square, hue bar, R/G/B and hex fields each update the colour, the dot (in place) and the bar; invalid input is flagged and ignored; *Use theme colour*.
+   - Right-click menu: opens at the cursor and is reachable, Duplicate (a theme colour stays a theme colour) and Remove, both disabled states, keyboard use.
    - The settings stay open after every picker and menu action; spacing under the title and above the help text.
    - Modal clean-up: listeners and observers removed on close, no clashes with Hazy's ids and classes.
    - Settings: invalid saved settings fall back to defaults with one warning; saves are debounced and survive a save–load round trip.
    - Bar size, radius and waveform masks unchanged.
 2. **Visual checklist** ([#14](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/14)). What needs a human:
    1. Hover, click-seek and drag the bar, solid and gradient → no colour flicker; the whole gradient is visible at roughly 5 %, 50 % and 95 %.
-   2. Click a dot → the picker opens under it and looks right; dragging in the square and hue bar feels smooth, also when you drag outside the settings; the eyedropper (if shown) picks a colour from the screen without closing the settings. Right-click a dot → Duplicate / Remove. Drag a dot → a marker shows where it lands, the order changes and no picker opens.
+   2. The picker is fully visible, nothing cut off, also under Hazy; clicking a dot moves the ring and the picker follows. Dragging in the square and hue bar feels smooth, also when you drag outside the settings; the eyedropper (if shown) picks a colour from the screen without closing the settings. Right-click a dot → Duplicate / Remove. Drag a dot → a marker shows where it lands and the order changes.
    3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour; off → plain bar correct.
    4. Hazy with *Custom color* on → change it and Apply → the bar follows; off → the bar follows the album-art colour across songs.
    5. After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
