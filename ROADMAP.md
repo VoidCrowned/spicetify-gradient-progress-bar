@@ -38,7 +38,7 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 
 Suggested build order: #2 → #1 → #6 → #3 → #4 → #5 → #7 → #9 → #8 → #10 → #23 → #11/#12 → #13 → #14.
 
-Builds were handed over as `Test build <sha>` comments on #14 (closed with the release). See `CLAUDE.md → Working mode`. Release notes: [CHANGELOG.md](CHANGELOG.md).
+Builds were handed over as `Test build <sha>` comments on #14 (closed with the release). See `CLAUDE.md → Working mode`. Release notes: [CHANGELOG.md](CHANGELOG.md); test procedure: [TESTING.md](TESTING.md).
 
 ## Next
 

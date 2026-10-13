@@ -11,7 +11,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 - **Work through a whole milestone (or a large batch of issues) without stopping.** Don't ask for confirmation between issues, and don't hand over per-step verification lists.
 - **Decide ambiguities yourself.** Pick the option most consistent with this file and the issues, note the decision in the relevant issue as a comment (`Decision: … because …`), and carry on. Only ask when a decision is irreversible or contradicts this file.
 - **Commit and push to `main` as you go** (one commit per issue, `Closes #n`). Never leave finished work only on the local machine.
-- **Live-DOM checks go into the self-test (#23), not into chat.** Anything you would otherwise ask the maintainer to run in devtools becomes a check inside `__gpb.selfTest()`. If something genuinely can't be automated, add it to the visual checklist in #14.
+- **Live-DOM checks go into the self-test (#23), not into chat.** Anything you would otherwise ask the maintainer to run in devtools becomes a check inside `__gpb.selfTest()`. If something genuinely can't be automated, add it to the visual checklist in `TESTING.md` (and the open release test-pass issue, #14 for v1.0.0).
 - **One hand-off per build.** When a batch is done: push, then post a single comment on #14 titled `Test build <short-sha>` with (1) what changed, (2) "run `await __gpb.selfTest()` and paste the output", (3) the short visual checklist — only things a human must look at. Then stop and wait.
 - **Bug reports come back as issues or a pasted self-test result.** Fix everything from one report in one batch, push, post the next `Test build` comment.
 - **Things only the maintainer can do** (screenshots for `preview.png`, adding the repo topic, Marketplace submission): collect them into the `Test build` comment as a short "Needs you" list rather than asking separately.
@@ -35,7 +35,11 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 |---|---|
 | `gradientProgressBar.js` | The extension. Single plain-JS file, no build step, no dependencies. |
 | `manifest.json` | Marketplace manifest (#13). |
-| `README.md` | User-facing docs, install, compatibility, testing checklist. |
+| `README.md` | User-facing docs: features, install, usage, compatibility, troubleshooting. |
+| `TESTING.md` | Devtools console, self-test coverage, visual checklist (≤ 8 items). |
+| `CONTRIBUTING.md` | Bug reports, Windows dev setup, PR checklist, issue conventions. |
+| `.github/ISSUE_TEMPLATE/bug_report.yml` | Bug report form (theme, versions, extensions, `__gpb` JSON); `config.yml` keeps blank issues enabled. |
+| `.github/workflows/issue-hygiene.yml` | Strips generated footers, ticks boxes on close. |
 | `ROADMAP.md` | Milestones → issues. Keep in sync. |
 | `preview.png` | Marketplace screenshot (#13). |
 
@@ -215,6 +219,6 @@ Devtools must be enabled (`spicetify enable-devtools`). The maintainer's setup: 
 Two layers:
 
 1. **Self-test (#23)** — `await __gpb.selfTest()` in devtools. Drives the extension programmatically, checks computed styles on the live DOM, restores the user's settings afterwards, prints a pass/fail table and copies a JSON report to the clipboard. Everything checkable by code lives here.
-2. **Visual checklist (#14)** — only what a human has to see or feel: flicker while seeking/hovering, drag-and-drop feel, colour picker opening, how it looks under the waveform and with Hazy. Keep it to ≤ 8 items.
+2. **Visual checklist** (`TESTING.md`; ticked per release in the test-pass issue, #14 for v1.0.0) — only what a human has to see or feel: flicker while seeking/hovering, drag-and-drop feel, colour picker opening, how it looks under the waveform and with Hazy. Keep it to ≤ 8 items.
 
-`README.md → Testing` mirrors both. Add a self-test check (preferred) or a visual item whenever a fix addresses something neither covered.
+`TESTING.md` documents both (devtools console, coverage list, checklist); keep it in sync with the self-test. Add a self-test check (preferred) or a visual item whenever a fix addresses something neither covered.
