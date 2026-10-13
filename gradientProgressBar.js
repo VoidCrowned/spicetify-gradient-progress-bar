@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 0.3.2
+// VERSION: 0.3.3
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "0.3.2";
+  const VERSION = "0.3.3";
 
   // Song progress bar only — the volume slider is the same component without this test id.
   const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -267,7 +267,7 @@
     return neighbour;
   }
 
-  // No confirmation: it's quickly undone.
+  // The button asks for a second click first (#37, enableReset).
   function resetSettings() {
     settings = defaultSettings();
     selectedId = settings.stops[0].id;
@@ -335,8 +335,13 @@
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.gpb-actions > .gpb-button { align-self: center; }
+.gpb-reset { display: inline-grid; justify-items: center; }
+.gpb-reset > span { grid-area: 1 / 1; }
+.gpb-reset-sizer { visibility: hidden; }
+.gpb-reset.gpb-armed, .gpb-reset.gpb-armed:hover:not(:disabled) { border-color: var(--spice-notification-error, #e91429); color: var(--spice-notification-error, #e91429); }
 .gpb-help { margin: 8px 0 0; font-size: .875rem; line-height: 1.5; color: var(--spice-subtext); }
-.gpb-footer { display: flex; justify-content: flex-end; }
 .gpb-popover { position: fixed; z-index: 10; box-sizing: border-box; border-radius: 8px; background-color: var(--spice-card); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); color: var(--spice-text); }
 .gpb-popover[hidden] { display: none; }
 .gpb-menu { display: flex; flex-direction: column; min-width: 140px; padding: 4px; }
@@ -388,6 +393,10 @@
     root.className = "gpb-modal";
     root.innerHTML = `
       <style>${MODAL_CSS}</style>
+      <div class="gpb-popover gpb-menu" role="menu" aria-label="Colour actions" hidden>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-duplicate">Duplicate</button>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-remove">Remove</button>
+      </div>
       <div class="gpb-gradient-row">
         <span class="gpb-label" id="gpb-gradient-label">Gradient</span>
         <button type="button" class="gpb-switch" role="switch" aria-labelledby="gpb-gradient-label"></button>
@@ -411,15 +420,11 @@
           <button type="button" class="gpb-button gpb-use-theme">Use theme colour</button>
         </div>
       </div>
-      <button type="button" class="gpb-button gpb-add">+ Add colour</button>
-      <p class="gpb-help">${HELP_TEXT}</p>
-      <div class="gpb-footer">
-        <button type="button" class="gpb-button gpb-reset">Reset</button>
+      <div class="gpb-actions">
+        <button type="button" class="gpb-button gpb-add">+ Add colour</button>
+        <button type="button" class="gpb-button gpb-reset"><span class="gpb-reset-label" aria-live="polite">Reset</span><span class="gpb-reset-sizer" aria-hidden="true">${RESET_CONFIRM_LABEL}</span></button>
       </div>
-      <div class="gpb-popover gpb-menu" role="menu" aria-label="Colour actions" hidden>
-        <button type="button" role="menuitem" class="gpb-menu-item gpb-duplicate">Duplicate</button>
-        <button type="button" role="menuitem" class="gpb-menu-item gpb-remove">Remove</button>
-      </div>`;
+      <p class="gpb-help">${HELP_TEXT}</p>`;
 
     const m = {
       root,
@@ -427,7 +432,11 @@
       switchButton: root.querySelector(".gpb-switch"),
       preview: root.querySelector(".gpb-preview"),
       stopsRow: root.querySelector(".gpb-stops"),
+      actions: root.querySelector(".gpb-actions"),
       addButton: root.querySelector(".gpb-add"),
+      resetButton: root.querySelector(".gpb-reset"),
+      resetLabel: root.querySelector(".gpb-reset-label"),
+      help: root.querySelector(".gpb-help"),
       menu: root.querySelector(".gpb-menu"),
       duplicateItem: root.querySelector(".gpb-duplicate"),
       removeItem: root.querySelector(".gpb-remove"),
@@ -446,7 +455,6 @@
 
     m.switchButton.addEventListener("click", toggleGradient);
     m.addButton.addEventListener("click", addStop);
-    root.querySelector(".gpb-reset").addEventListener("click", resetSettings);
     m.stopsRow.addEventListener("click", (e) => {
       const el = e.target.closest(".gpb-stop");
       if (!el || performance.now() - lastDragEnd < 300) return; // a drag never changes the selection
@@ -454,6 +462,7 @@
     });
     enableDotMenu(m);
     enableColourPicker(m);
+    enableReset(m);
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
     modal = m;
@@ -463,6 +472,56 @@
     watchThemeColour(m);
     watchPopovers(m);
     enableDragAndDrop(m);
+  }
+
+  // ── Two-step Reset (#37) ──
+  // Reset can't be undone and sits next to + Add colour, so the first click only arms it
+  // ("Confirm reset?" in red); a second click within RESET_CONFIRM_MS resets. Only the label
+  // and a class change — the button node is never replaced, so its click target stays
+  // connected (#26). A hidden copy of the longer label keeps the button's width fixed.
+
+  const RESET_CONFIRM_MS = 3000;
+  const RESET_CONFIRM_LABEL = "Confirm reset?";
+
+  function enableReset(m) {
+    const button = m.resetButton;
+    let timer = 0;
+    const armed = () => button.classList.contains("gpb-armed");
+    const disarm = () => {
+      clearTimeout(timer);
+      timer = 0;
+      button.classList.remove("gpb-armed");
+      m.resetLabel.textContent = "Reset";
+    };
+    button.addEventListener("click", () => {
+      if (armed()) {
+        disarm();
+        resetSettings();
+        return;
+      }
+      button.classList.add("gpb-armed");
+      m.resetLabel.textContent = RESET_CONFIRM_LABEL;
+      timer = setTimeout(disarm, RESET_CONFIRM_MS);
+    });
+    button.addEventListener("blur", () => armed() && disarm());
+
+    // Any other click or key disarms; Enter/Space on the button are the confirmation itself.
+    const listen = (type, handler) => {
+      document.addEventListener(type, handler, true);
+      m.cleanups.push(() => document.removeEventListener(type, handler, true));
+    };
+    const elsewhere = (e) => armed() && !button.contains(e.target) && disarm();
+    listen("pointerdown", elsewhere);
+    listen("click", elsewhere);
+    listen("keydown", (e) => {
+      if (!armed()) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation(); // Reset disarms, the modal stays
+        disarm();
+      } else if (!button.contains(e.target)) disarm();
+    });
+    m.cleanups.push(disarm); // clears the timer when the modal closes
   }
 
   // ── Selection ──
@@ -1298,19 +1357,18 @@
     const colorInput = document.getElementById("color-input");
     check(3, "No id=color-input of ours (Hazy looks it up)", !colorInput || !m.root.contains(colorInput),
       colorInput ? "exists, but it's not ours" : "none in the document");
-    const help = m.root.querySelector(".gpb-help");
-    const addBtn = m.root.querySelector(".gpb-add");
-    check(35, "Help text sits between + Add colour and Reset",
-      help?.textContent === HELP_TEXT && addBtn.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING &&
-        help.compareDocumentPosition(m.root.querySelector(".gpb-reset")) & Node.DOCUMENT_POSITION_FOLLOWING,
-      help?.textContent ?? "missing");
+    const help = m.help;
+    check(37, "Help text is the last element of the modal content, after the action row",
+      help.textContent === HELP_TEXT && m.root.lastElementChild === help &&
+        m.actions.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING && !m.root.querySelector(".gpb-footer"),
+      `last child .${m.root.lastElementChild?.className}, text "${help.textContent}"`);
     const icons = m.stopsRow.querySelectorAll("svg, .gpb-action, .gpb-badge, .gpb-grip");
     check(31, "No icons on the colour dots", !icons.length, `${icons.length} found`);
     const editorRow = m.root.querySelectorAll('.gpb-editor, input[type="color"]');
     check(32, "No editor row and no native colour input", !editorRow.length, `${editorRow.length} found`);
     check(35, "Picker is an inline panel between the dots and + Add colour, not a popover",
       m.picker.parentElement === m.root && m.picker.previousElementSibling === m.stopsRow &&
-        m.picker.nextElementSibling === m.addButton && !m.picker.hidden && getComputedStyle(m.picker).position === "static",
+        m.picker.nextElementSibling === m.actions && !m.picker.hidden && getComputedStyle(m.picker).position === "static",
       `after .${m.picker.previousElementSibling?.className}, before .${m.picker.nextElementSibling?.className}, ` +
         `position ${getComputedStyle(m.picker).position}`);
 
@@ -1338,10 +1396,37 @@
       (el) => !el.contains(m.root) && !m.root.contains(el) && el.textContent.trim() === "Gradient Progress Bar"
     );
     const titleGap = titleBar ? m.gradientRow.getBoundingClientRect().top - titleBar.getBoundingClientRect().bottom : NaN;
-    const helpGap = help.getBoundingClientRect().top - addBtn.getBoundingClientRect().bottom;
-    check(34, "Spacing: title bar → Gradient row and + Add colour → help text are both ≥ 16 px",
+    const helpGap = help.getBoundingClientRect().top - m.actions.getBoundingClientRect().bottom;
+    check(34, "Spacing: title bar → Gradient row and action row → help text are both ≥ 16 px",
       titleGap >= 16 && helpGap >= 16,
       `title gap ${titleBar ? `${Math.round(titleGap)} px` : "title bar not found"}, help gap ${Math.round(helpGap)} px`);
+
+    // ── Action row (#37) ──
+    const rowRect = m.actions.getBoundingClientRect();
+    const addRect = m.addButton.getBoundingClientRect();
+    const resetRect = m.resetButton.getBoundingClientRect();
+    const centreY = (r) => r.top + r.height / 2;
+    const leftOff = addRect.left - rowRect.left;
+    const rightOff = rowRect.right - resetRect.right;
+    const centreDiff = Math.abs(centreY(addRect) - centreY(resetRect));
+    check(37, "+ Add colour and Reset share one row: Add at its left edge, Reset at its right",
+      m.addButton.parentElement === m.actions && m.resetButton.parentElement === m.actions &&
+        centreDiff <= 2 && Math.abs(leftOff) <= 2 && Math.abs(rightOff) <= 2,
+      `centres differ ${centreDiff.toFixed(1)} px, Add ${leftOff.toFixed(1)} px from the left, ` +
+        `Reset ${rightOff.toFixed(1)} px from the right, row ${Math.round(rowRect.width)} px`);
+    check(37, "Action row → help text gap is ≥ 16 px", helpGap >= 16, `${helpGap.toFixed(1)} px`);
+    // The content's bottom inside Spicetify's container (scroll-aware, its own padding excluded):
+    // anything more than a small gap below the help text is empty space of ours.
+    const container = m.root.parentElement;
+    const containerStyle = getComputedStyle(container);
+    const contentBottom = container.getBoundingClientRect().top + container.clientTop - container.scrollTop +
+      container.scrollHeight - parseFloat(containerStyle.paddingBottom || "0");
+    const helpBottom = help.getBoundingClientRect().bottom;
+    const bottomGap = contentBottom - helpBottom;
+    check(37, "Help text bottom → modal content bottom is ≤ 24 px (no empty footer)", bottomGap <= 24,
+      `${bottomGap.toFixed(1)} px (help → our root's bottom ${(m.root.getBoundingClientRect().bottom - helpBottom).toFixed(1)} px, ` +
+        `container <${container.tagName.toLowerCase()}> padding-bottom ${containerStyle.paddingBottom})`);
+
     const cursor = rightClick(dots()[1]);
     const mr = m.menu.getBoundingClientRect();
     const near = (a, b) => Math.abs(a - b) < 1.5;
@@ -1593,11 +1678,71 @@
       draggable.map((el) => `${el.tagName.toLowerCase()}.${el.className}`).join(", "));
 
     stillOpen("dragging a stop");
-    m.root.querySelector(".gpb-reset").click();
-    check(10, "Reset → defaults and an empty stylesheet",
+
+    // ── Two-step Reset (#37): real pointer/mouse sequences and keys on the same button node ──
+    const realClick = (el) => {
+      const r = el.getBoundingClientRect();
+      const init = { bubbles: true, cancelable: true, composed: true, button: 0, detail: 1,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+      const ptr = { pointerId: 1, pointerType: "mouse", isPrimary: true };
+      el.dispatchEvent(new PointerEvent("pointerdown", { ...init, ...ptr, buttons: 1 }));
+      el.dispatchEvent(new MouseEvent("mousedown", { ...init, buttons: 1 }));
+      el.dispatchEvent(new PointerEvent("pointerup", { ...init, ...ptr, buttons: 0 }));
+      el.dispatchEvent(new MouseEvent("mouseup", init));
+      el.dispatchEvent(new MouseEvent("click", init));
+    };
+    const resetBtn = m.resetButton;
+    const isArmed = () => resetBtn.classList.contains("gpb-armed") && m.resetLabel.textContent === RESET_CONFIRM_LABEL;
+    const isIdle = () => !resetBtn.classList.contains("gpb-armed") && m.resetLabel.textContent === "Reset";
+    const resetState = () => `label "${m.resetLabel.textContent}", armed class ${resetBtn.classList.contains("gpb-armed")}, ` +
+      `stops ${settings.stops.map((s) => s.id).join()}`;
+
+    const beforeReset = JSON.stringify(settings);
+    const idleWidth = resetBtn.getBoundingClientRect().width;
+    realClick(resetBtn);
+    const armedWidth = resetBtn.getBoundingClientRect().width;
+    check(37, "First click on Reset doesn't reset; label 'Confirm reset?' with the warning class",
+      JSON.stringify(settings) === beforeReset && isArmed(), resetState());
+    check(37, "Reset button keeps its width when armed (≤ 1 px)", Math.abs(armedWidth - idleWidth) <= 1,
+      `Reset ${idleWidth.toFixed(1)} px, Confirm reset? ${armedWidth.toFixed(1)} px`);
+    realClick(resetBtn);
+    check(10, "Second click on Reset → defaults and an empty stylesheet",
       JSON.stringify(settings) === JSON.stringify(defaultSettings()) && styleText() === "", JSON.stringify(settings));
     stillOpen("Reset");
     check(35, "Reset selects the first dot", selectionIs(settings.stops[0].id), selection());
+    check(37, "After resetting, the same button reads 'Reset' again",
+      m.resetButton === resetBtn && resetBtn.isConnected && isIdle(), resetState());
+
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)]);
+    selectStop("s1");
+    const armedBase = JSON.stringify(settings);
+    realClick(resetBtn);
+    const armedAtStart = isArmed();
+    await sleep(RESET_CONFIRM_MS + 200);
+    check(37, `Armed Reset disarms after ${RESET_CONFIRM_MS / 1000} s without resetting`,
+      armedAtStart && isIdle() && JSON.stringify(settings) === armedBase, resetState());
+
+    realClick(resetBtn);
+    press(resetBtn, "Escape");
+    check(37, "Escape disarms Reset without resetting", isIdle() && JSON.stringify(settings) === armedBase, resetState());
+    stillOpen("Escape on an armed Reset");
+
+    realClick(resetBtn);
+    realClick(dots()[1]);
+    check(37, "Clicking a dot disarms Reset without resetting; the selection moves",
+      isIdle() && JSON.stringify(settings) === armedBase && selectionIs("s2"), `${resetState()}; ${selection()}`);
+
+    realClick(resetBtn);
+    const oldLabel = m.resetLabel;
+    Spicetify.PopupModal.hide();
+    await tick(); // the close observer runs the clean-ups
+    openModal();
+    m = modal;
+    check(37, "Arm, close and reopen → the button reads 'Reset' (timer cleared)",
+      !!m && m.resetLabel.textContent === "Reset" && !m.resetButton.classList.contains("gpb-armed") &&
+        oldLabel.textContent === "Reset" && JSON.stringify(settings) === armedBase,
+      `new "${m?.resetLabel.textContent}", old "${oldLabel.textContent}"`);
+    if (!m) return;
 
     const listenersOpen = songchangeCount();
     const observersOpen = liveObservers;

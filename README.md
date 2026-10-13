@@ -48,7 +48,7 @@ To uninstall manually: `spicetify config extensions gradientProgressBar.js-` the
 - **Right-click a dot** for **Duplicate** and **Remove** (also with the context-menu key or Shift+F10).
 - **+ Add colour** adds another and selects it; with two or more, gradient mode switches on.
 - **Drag the dots** to reorder the gradient.
-- **Reset** returns to the default (your theme's own colour, no gradient).
+- **Reset** returns to the default (your theme's own colour, no gradient). It asks for a second click to confirm: the button turns red and reads *Confirm reset?* for 3 seconds; waiting, pressing Escape or clicking anything else cancels.
 
 ## Compatibility
 
@@ -76,7 +76,9 @@ Two layers, run before each release:
    - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
    - Solid and gradient rendering: Compress-mode sizing, stop order, handle colour.
    - Theme stop: emitted as a CSS variable, follows runtime `--spice-button` changes, and the open modal's swatch follows too.
-   - Switch, add, the 8-stop limit, dimmed unused stops, preview, drag reorder and reset.
+   - Switch, add, the 8-stop limit, dimmed unused stops, preview, drag reorder.
+   - Layout: *+ Add colour* and *Reset* in one row (left and right edges), help text last with no empty footer below it.
+   - Two-step Reset with real clicks: the first click only arms it (*Confirm reset?*, same width), the second resets; waiting 3 s, Escape, clicking a dot, or closing the settings disarms it without resetting.
    - Selection: the first dot is selected on open and after Reset; Add and Duplicate select the new dot; removing the selected dot selects its neighbour; clicking a dot moves the ring without rebuilding the dots; a drag never changes it.
    - Inline colour picker, driven with real pointer and keyboard events: it sits between the dots and *+ Add colour*, side by side when there's room; every control is reachable (scrolled into view and hit-tested, so nothing is clipped); the `HEX:` row is centred with a half-width field; the square, hue bar, R/G/B and hex fields each update the colour, the dot (in place) and the bar; invalid input is flagged and ignored; *Use theme colour*.
    - Right-click menu: opens at the cursor and is reachable, Duplicate (a theme colour stays a theme colour) and Remove, both disabled states, keyboard use.
@@ -91,8 +93,8 @@ Two layers, run before each release:
    4. Hazy with *Custom color* on → change it and Apply → the bar follows; off → the bar follows the album-art colour across songs.
    5. After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
    6. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → bar and modal readable, theme stop falls back sensibly.
-   7. Reload Spotify → settings persist.
-   8. Podcast episode and window resize → no `[gpb]` errors in the console.
+   7. Reload Spotify → settings persist; a podcast episode and a window resize → no `[gpb]` errors in the console.
+   8. Reset → *Confirm reset?* (red) → a second click resets; waiting 3 s or clicking elsewhere cancels.
 
 ## Contributing
 
