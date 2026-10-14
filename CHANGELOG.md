@@ -2,6 +2,14 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.2.2] — 2026-10-14
+
+### Changed
+- **Spread: the selected mode is filled with your theme colour** ([#43](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/43)). The thin outline and faint tint from 1.2.1 were hard to spot on a dark background. The button is now filled like the Gradient switch, and its label switches between your theme's text and background colours, whichever is easier to read on it. That keeps it readable with light album-art colours under Hazy and in light themes.
+
+### Maintenance
+- **Workflows** ([#42](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/42)): the issue-hygiene workflow runs on `actions/github-script@v9` (Node 24). The 3-hourly CDN check moved into its own workflow, so if GitHub pauses it after a quiet stretch, the purge on every release keeps working and switches the check back on.
+
 ## [1.2.1] — 2026-10-14
 
 ### Fixed
