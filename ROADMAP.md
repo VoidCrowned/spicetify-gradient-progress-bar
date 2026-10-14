@@ -2,6 +2,13 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.2.1 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#40](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/40) | Spread: selected mode tinted with a stale colour instead of the theme colour | bug, ui, compatibility | ⏳ |
+| [#41](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/41) | Purge workflow fails when jsDelivr throttles or is slow to refresh @main | bug, packaging | ⏳ |
+
 ## v1.2.0 — released 2026-10-14
 
 | # | Issue | Area | Status |
@@ -60,7 +67,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-Nothing is scheduled yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
+v1.2.1 (#40, #41) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
 
 ## Future
 
