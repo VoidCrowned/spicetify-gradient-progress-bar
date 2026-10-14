@@ -344,6 +344,8 @@
   // (#32, #35), right-click for Duplicate / Remove (#33), drag or Alt+arrows to reorder
   // (#8, #24). No icons on the dots (#31). Exactly one dot is selected whenever the modal is open.
 
+  // Tints use color-mix() on var(--spice-button): Hazy rewrites --spice-button at runtime but
+  // leaves --spice-rgb-button at the colour scheme's value (#40).
   const MODAL_CSS = `
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; padding-top: 20px; color: var(--spice-text); }
 .gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
@@ -358,7 +360,7 @@
 .gpb-spread-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gpb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
 .gpb-mode { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background-color .15s; }
-.gpb-mode[aria-checked="true"] { border-color: var(--spice-button); background-color: rgba(var(--spice-rgb-button), .3); }
+.gpb-mode[aria-checked="true"] { border-color: var(--spice-button); background-color: color-mix(in srgb, var(--spice-button) 30%, transparent); }
 .gpb-mode:hover:not(:disabled):not([aria-checked="true"]) { background-color: rgba(var(--spice-rgb-text), .1); }
 .gpb-mode:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-mode:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
@@ -2024,6 +2026,23 @@
       spreadShows("anchored", true) && styleText().includes("clip-path:") && dots().every((el, i) => el === dotsBeforeMode[i]),
       spreadState());
     stillOpen("choosing Anchored");
+    // Hazy changes --spice-button at runtime; --spice-rgb-button stays stale (#40).
+    const rgba = (colour) => {
+      const n = colour.match(/[\d.]+/g)?.map(Number) ?? [];
+      const [r, g, b] = colour.startsWith("color(") ? n.slice(0, 3).map((v) => v * 255) : n.slice(0, 3); // color-mix() → color(srgb …)
+      return [r, g, b].map(Math.round).concat(n[3] ?? 1);
+    };
+    rootStyle.setProperty("--spice-button", PROBE, "important");
+    await sleep(250); // the button's background-color transition (.15 s)
+    const tint = getComputedStyle(modeBtn("anchored")).backgroundColor;
+    restoreButton();
+    await sleep(250);
+    const [tr, tg, tb, ta] = rgba(tint);
+    const [pr, pg, pb] = rgba(`rgb(${hexToRgb(PROBE).join(", ")})`);
+    check(40, "Checked Spread button follows a runtime --spice-button change (same RGB, about 30 % alpha); no --spice-rgb-button in the modal CSS",
+      Math.abs(tr - pr) <= 1 && Math.abs(tg - pg) <= 1 && Math.abs(tb - pb) <= 1 && Math.abs(ta - 0.3) <= 0.02 &&
+        !MODAL_CSS.includes("--spice-rgb-button"),
+      `background ${tint} with --spice-button ${PROBE}; modal CSS uses --spice-rgb-button: ${MODAL_CSS.includes("--spice-rgb-button")}`);
     realClick(modeBtn("slide"));
     check(15, "Clicking Slide → Slide, hint updated in place", spreadShows("slide", true) && !styleText().includes("clip-path:"),
       spreadState());
