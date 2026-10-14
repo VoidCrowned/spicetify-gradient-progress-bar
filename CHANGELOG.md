@@ -2,6 +2,16 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.2.0] — 2026-10-14
+
+### Added
+- **Spread modes** ([#15](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/15)): choose how a gradient covers the bar, in a new *Spread* row under the Gradient switch.
+  - *Compress* (the default, as before): the whole gradient always fits between the start and the playhead.
+  - *Anchored*: the colours stay fixed to the bar and are revealed as the song plays. Looks especially good with playback-bar-waveform.
+  - *Slide*: a full-length gradient slides in with the playhead.
+
+  Solid colours look the same in every mode, and settings saved by earlier versions load as *Compress*. The self-test checks every mode on the live bar.
+
 ## [1.1.0] — 2026-10-14
 
 ### Added

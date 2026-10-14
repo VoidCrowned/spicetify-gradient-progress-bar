@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 1.1.0
+// VERSION: 1.2.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -8,6 +8,7 @@
 //  1. Every rule is scoped to the song progress bar — the volume slider never changes.
 //  2. Never sets mask, height, width, transform, --progress-bar-height, --progress-bar-radius,
 //     --progress-bar-transform or any other layout property on bar elements.
+//     Only exception: Anchored mode sets transform: none and clip-path on the fill (#15).
 //  3. Never overrides --fg-color, --bg-color or --is-active-fg-color.
 //  4. No !important — rules win by specificity only.
 //  5. No element references from JS for the bar — one regenerated <style id="gpb-style">.
@@ -16,7 +17,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "1.1.0";
+  const VERSION = "1.2.0";
   // Where this copy was loaded from: the Marketplace (jsDelivr) or the CLI (extensions/).
   // currentScript is only set before the first await, so capture it here (#39).
   const SOURCE = document.currentScript?.src || null;
@@ -63,6 +64,9 @@
   const MAX_STOPS = 8;
   const SAVE_DELAY = 250;
   const HEX_RE = /^#[0-9a-f]{6}$/i;
+  // How a gradient spreads over the bar (#15). Optional in storage: missing means "compress".
+  const MODES = ["compress", "anchored", "slide"];
+  const DEFAULT_MODE = "compress";
 
 
   // Never resolved to a hex, so it follows runtime theme changes (e.g. Hazy's per-song accent).
@@ -71,7 +75,7 @@
   // ── Settings ────────────────────────────────────────────────────────────────
 
   function defaultSettings() {
-    return { version: SCHEMA_VERSION, gradient: false, stops: [{ id: "s1", kind: "theme" }] };
+    return { version: SCHEMA_VERSION, gradient: false, mode: DEFAULT_MODE, stops: [{ id: "s1", kind: "theme" }] };
   }
 
   // Returns a clean copy of `data`, or null if it isn't valid settings.
@@ -79,6 +83,9 @@
     if (!data || typeof data !== "object" || data.version !== SCHEMA_VERSION) return null;
     if (typeof data.gradient !== "boolean" || !Array.isArray(data.stops)) return null;
     if (data.stops.length < 1 || data.stops.length > MAX_STOPS) return null;
+    // Settings saved before v1.2.0 have no mode; anything else unknown is invalid.
+    const mode = data.mode === undefined ? DEFAULT_MODE : data.mode;
+    if (!MODES.includes(mode)) return null;
 
     const ids = new Set();
     const stops = [];
@@ -91,7 +98,7 @@
       else return null;
     }
     // A gradient needs at least two stops.
-    return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, stops };
+    return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, mode, stops };
   }
 
   function loadSettings(raw = Spicetify.LocalStorage.get(STORAGE_KEY)) {
@@ -148,27 +155,39 @@
     return `linear-gradient(90deg, ${colours.join(", ")})`;
   }
 
+  // The fill is a full-width element translated left, so only its rightmost
+  // --progress-bar-transform percent is visible. Gradient-only declarations per mode (#15):
+  // - Compress: size the gradient to that visible slice and anchor it right, so the whole
+  //   gradient always spans bar start → playhead.
+  // - Anchored: undo Spotify's translate and clip at the playhead instead, so the colours stay
+  //   fixed to the track. The one deliberate exception to "never set transform" (CLAUDE.md).
+  // - Slide: no overrides; the full-track gradient moves with the fill.
+  const MODE_CSS = {
+    compress: [
+      "background-size: var(--progress-bar-transform) 100%;",
+      "background-position: right center;",
+      "background-repeat: no-repeat;",
+    ],
+    anchored: [
+      "background-size: 100% 100%;",
+      "transform: none;",
+      "clip-path: inset(0 calc(100% - var(--progress-bar-transform)) 0 0 round var(--progress-bar-radius));",
+    ],
+    slide: [],
+  };
+
   // Selectors are ≥ 0,2,0 so they beat themes' single-class rules without !important.
   // background-image (not -color) keeps Spotify's hover swap of background-color hidden.
-  //
-  // Compress mode: the fill is a full-width element translated left, so only its rightmost
-  // --progress-bar-transform percent is visible. Sizing the gradient to that slice and
-  // anchoring it right makes the whole gradient span bar start → playhead.
+  // Solid output is the same in every mode.
   function buildCss(s) {
     if (isInert(s)) return "";
     const colours = activeColours(s);
-    const handle = colours[colours.length - 1];
-    const compress = s.gradient
-      ? [
-          `  background-size: var(--progress-bar-transform) 100%;`,
-          `  background-position: right center;`,
-          `  background-repeat: no-repeat;`,
-        ]
-      : [];
+    const handle = colours[colours.length - 1]; // the last stop in every mode (#22 may refine Anchored)
+    const spread = s.gradient ? MODE_CSS[s.mode].map((line) => `  ${line}`) : [];
     return [
       `${SCOPE} ${FILL} {`,
       `  background-image: ${fillImage(s)};`,
-      ...compress,
+      ...spread,
       `}`,
       `${SCOPE} ${HANDLE} {`,
       `  background-color: ${handle};`,
@@ -277,6 +296,14 @@
     update();
   }
 
+  // Called from the Spread row, which is updated in place: the dots aren't re-rendered.
+  function setMode(mode) {
+    if (!MODES.includes(mode) || mode === settings.mode) return;
+    settings.mode = mode;
+    update({ rerender: false });
+    if (modal) renderSpread();
+  }
+
   function toggleGradient() {
     if (settings.stops.length < 2) return;
     settings.gradient = !settings.gradient;
@@ -327,6 +354,15 @@
 .gpb-switch[aria-checked="true"]::after { transform: translateX(18px); }
 .gpb-switch:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-switch:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-spread { display: flex; flex-direction: column; gap: 8px; }
+.gpb-spread-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gpb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
+.gpb-mode { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background-color .15s; }
+.gpb-mode[aria-checked="true"] { border-color: var(--spice-button); background-color: rgba(var(--spice-rgb-button), .3); }
+.gpb-mode:hover:not(:disabled):not([aria-checked="true"]) { background-color: rgba(var(--spice-rgb-text), .1); }
+.gpb-mode:disabled { opacity: .5; cursor: not-allowed; }
+.gpb-mode:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-spread-hint { margin: 0; font-size: .75rem; line-height: 1.4; color: var(--spice-subtext); }
 .gpb-preview { height: 8px; border-radius: 4px; }
 .gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 14px; padding: 4px; }
 .gpb-stop { position: relative; width: 32px; height: 32px; padding: 0; border: 2px solid rgba(var(--spice-rgb-text), .25); border-radius: 50%; cursor: pointer; }
@@ -377,6 +413,14 @@
   // than a container query: inline-size containment could collapse a shrink-to-fit modal.
   const PICKER_COLUMNS_MIN = 420;
 
+  const MODE_LABELS = { compress: "Compress", anchored: "Anchored", slide: "Slide" };
+  const SPREAD_HINTS = {
+    compress: "The whole gradient always fits between the start and the playhead.",
+    anchored: "Colours stay fixed to the bar and are revealed as the song plays.",
+    slide: "The gradient spans the whole bar and slides in with the playhead.",
+  };
+  const SPREAD_OFF_HINT = "Applies when the gradient is on.";
+
   const REORDER_HINT = "Drag or Alt+←/→ to reorder"; // second line of the dot tooltip (#24)
   const HELP_TEXT =
     "Click a colour to edit it below, right-click it to duplicate or remove it. Drag colours to reorder them.";
@@ -407,6 +451,15 @@
         <span class="gpb-label" id="gpb-gradient-label">Gradient</span>
         <button type="button" class="gpb-switch" role="switch" aria-labelledby="gpb-gradient-label"></button>
       </div>
+      <div class="gpb-spread">
+        <div class="gpb-spread-row">
+          <span class="gpb-label" id="gpb-spread-label">Spread</span>
+          <div class="gpb-modes" role="radiogroup" aria-labelledby="gpb-spread-label" aria-describedby="gpb-spread-hint">
+            ${MODES.map((mode) => `<button type="button" class="gpb-mode" role="radio" data-mode="${mode}">${MODE_LABELS[mode]}</button>`).join("")}
+          </div>
+        </div>
+        <p class="gpb-spread-hint" id="gpb-spread-hint"></p>
+      </div>
       <div class="gpb-preview"></div>
       <div class="gpb-stops"></div>
       <div class="gpb-colour-picker" role="group" aria-label="Selected colour">
@@ -436,6 +489,10 @@
       root,
       gradientRow: root.querySelector(".gpb-gradient-row"),
       switchButton: root.querySelector(".gpb-switch"),
+      spread: root.querySelector(".gpb-spread"),
+      modes: root.querySelector(".gpb-modes"),
+      modeButtons: [...root.querySelectorAll(".gpb-mode")],
+      spreadHint: root.querySelector(".gpb-spread-hint"),
       preview: root.querySelector(".gpb-preview"),
       stopsRow: root.querySelector(".gpb-stops"),
       actions: root.querySelector(".gpb-actions"),
@@ -461,6 +518,7 @@
     };
 
     m.switchButton.addEventListener("click", toggleGradient);
+    enableSpread(m);
     m.addButton.addEventListener("click", addStop);
     m.stopsRow.addEventListener("click", (e) => {
       const el = e.target.closest(".gpb-stop");
@@ -480,6 +538,39 @@
     watchPopovers(m);
     enableDragAndDrop(m);
     enableKeyboardReorder(m);
+  }
+
+  // ── Spread (#15) ──
+  // A radiogroup of plain buttons (no <select>: Hazy styles select globally). Built once per
+  // open and only updated in place, so a click never detaches its target (#26). Roving
+  // tabindex; ←/→ (wrapping), Home and End move the choice, without modifier keys only.
+  function enableSpread(m) {
+    m.modes.addEventListener("click", (e) => {
+      const button = e.target.closest(".gpb-mode");
+      if (button && !button.disabled) setMode(button.dataset.mode);
+    });
+    m.modes.addEventListener("keydown", (e) => {
+      const button = e.target.closest(".gpb-mode");
+      if (!button || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const i = m.modeButtons.indexOf(button);
+      const last = m.modeButtons.length - 1;
+      const next = { ArrowLeft: i ? i - 1 : last, ArrowRight: i === last ? 0 : i + 1, Home: 0, End: last }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      setMode(m.modeButtons[next].dataset.mode);
+      m.modeButtons[next].focus();
+    });
+  }
+
+  function renderSpread() {
+    const on = settings.gradient;
+    for (const button of modal.modeButtons) {
+      const checked = button.dataset.mode === settings.mode;
+      button.setAttribute("aria-checked", String(checked));
+      button.tabIndex = checked ? 0 : -1;
+      button.disabled = !on;
+    }
+    modal.spreadHint.textContent = on ? SPREAD_HINTS[settings.mode] : SPREAD_OFF_HINT;
   }
 
   // ── Two-step Reset (#37) ──
@@ -1006,6 +1097,7 @@
     closePopover(); // the dots are rebuilt, so the menu would lose its anchor
     if (!findStop(selectedId)) selectedId = settings.stops[0].id; // never nothing selected
     renderSwitch();
+    renderSpread(); // in place: the Spread row is never rebuilt
     renderPreview();
     renderStops();
     showInPicker(findStop(selectedId));
@@ -1102,26 +1194,43 @@
     });
   }
 
-  function setTestSettings(gradient, stops) {
-    settings = { version: SCHEMA_VERSION, gradient, stops: stops.map((s) => ({ ...s })) };
+  function setTestSettings(gradient, stops, mode = DEFAULT_MODE) {
+    settings = { version: SCHEMA_VERSION, gradient, mode, stops: stops.map((s) => ({ ...s })) };
     update();
   }
 
   // Declarations our stylesheet must never contain (CLAUDE.md → Hard rules).
   const FORBIDDEN_PROP =
-    /^(-webkit-)?(mask(-.+)?|height|width|transform|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
+    /^(-webkit-)?(mask(-.+)?|height|width|transform|clip-path|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
 
-  function cssProblems(css) {
+  // `mode` is the mode the CSS was built for. The only exception (#15): Anchored's fill rule
+  // may set `transform: none` and `clip-path`.
+  function cssProblems(css, mode) {
     const problems = [];
     if (/!important/i.test(css)) problems.push("!important");
-    for (const [, selector] of css.matchAll(/([^{}]+)\{/g))
-      if (!selector.trim().startsWith(SCOPE)) problems.push(`unscoped rule: ${selector.trim()}`);
-    for (const [, body] of css.matchAll(/\{([^}]*)\}/g))
+    for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const sel = selector.trim();
+      if (!sel.startsWith(SCOPE)) problems.push(`unscoped rule: ${sel}`);
+      const anchoredFill = mode === "anchored" && sel === `${SCOPE} ${FILL}`;
       for (const decl of body.split(";")) {
-        const prop = decl.split(":")[0].trim();
-        if (FORBIDDEN_PROP.test(prop)) problems.push(`sets ${prop}`);
+        const [prop, ...rest] = decl.split(":");
+        const name = prop.trim();
+        const value = rest.join(":").trim();
+        const allowed = anchoredFill && ((name === "transform" && value === "none") || name === "clip-path");
+        if (FORBIDDEN_PROP.test(name) && !allowed) problems.push(`sets ${name}`);
       }
+    }
     return problems;
+  }
+
+  // The fill's computed transform with our stylesheet and without it, read in the same task so
+  // playback can't move in between.
+  function fillTransforms(fill) {
+    const sheet = document.getElementById("gpb-style")?.sheet;
+    if (sheet) sheet.disabled = true;
+    const spotify = getComputedStyle(fill).transform;
+    if (sheet) sheet.disabled = false;
+    return { ours: getComputedStyle(fill).transform, spotify };
   }
 
   // playback-bar-waveform masks the song bar's slider areas with held Web Animations.
@@ -1245,11 +1354,41 @@
       [true, [theme("s1"), custom("s2", RED), custom("s3", BLUE)]],
       [false, [custom("s1", RED), theme("s2"), custom("s3", BLUE)]],
     ];
-    const problems = samples.flatMap(([gradient, stops]) =>
-      cssProblems(buildCss({ version: SCHEMA_VERSION, gradient, stops }))
+    const css = (mode, gradient, stops) => buildCss({ version: SCHEMA_VERSION, gradient, mode, stops });
+    const problems = MODES.flatMap((mode) =>
+      samples.flatMap(([gradient, stops]) => cssProblems(css(mode, gradient, stops), mode).map((p) => `${mode}: ${p}`))
     );
-    check(1, "CSS: every rule scoped, no !important, no forbidden properties", !problems.length,
-      problems.join("; ") || `${samples.length} samples clean`);
+    check(1, "CSS: every rule scoped, no !important, no forbidden properties (all three modes)", !problems.length,
+      problems.join("; ") || `${samples.length} samples × ${MODES.length} modes clean`);
+    // The linter itself: Anchored's exception must not leak into other modes or rules.
+    const anchoredCss = css("anchored", true, [custom("s1", RED), custom("s2", BLUE)]);
+    const leaks = {
+      "Anchored CSS checked as Compress": cssProblems(anchoredCss, "compress"),
+      "Anchored CSS checked as Slide": cssProblems(anchoredCss, "slide"),
+      "transform other than none": cssProblems(anchoredCss.replace("transform: none", "transform: translateX(0)"), "anchored"),
+      "transform on the handle": cssProblems(anchoredCss.replace(`${HANDLE} {`, `${HANDLE} {\n  transform: none;`), "anchored"),
+    };
+    const missed = Object.entries(leaks).filter(([, found]) => !found.length).map(([label]) => label);
+    check(15, "CSS lint allows transform: none + clip-path only in Anchored's fill rule",
+      !cssProblems(anchoredCss, "anchored").length && !missed.length,
+      missed.length ? `not flagged: ${missed.join(", ")}` : `flagged: ${Object.values(leaks).map((p) => p.join("/")).join("; ")}`);
+    const solids = MODES.map((mode) => css(mode, false, [custom("s1", RED), custom("s2", GREEN)]));
+    const inert = MODES.map((mode) => buildCss({ ...defaultSettings(), mode }));
+    check(15, "Solid output is identical in all three modes; default settings are inert in every mode",
+      solids[0] !== "" && solids.every((c) => c === solids[0]) && inert.every((c) => c === ""),
+      `solid ${solids.map((c) => c.length).join("/")} chars, defaults ${inert.map((c) => JSON.stringify(c)).join("/")}`);
+    const perMode = Object.fromEntries(MODES.map((mode) => [mode, css(mode, true, [custom("s1", RED), custom("s2", BLUE)])]));
+    check(15, "Gradient CSS per mode: Compress sizes to the playhead, Anchored clips, Slide has no overrides",
+      perMode.compress.includes("background-size: var(--progress-bar-transform) 100%;") &&
+        perMode.compress.includes("background-position: right center;") &&
+        perMode.anchored.includes("transform: none;") &&
+        perMode.anchored.includes("clip-path: inset(0 calc(100% - var(--progress-bar-transform)) 0 0 round var(--progress-bar-radius));") &&
+        !/background-(size|position)|transform:|clip-path/.test(perMode.slide),
+      MODES.map((mode) => `${mode}: ${perMode[mode].replace(/\s+/g, " ")}`).join(" | "));
+    const themeCssPerMode = MODES.map((mode) => css(mode, true, [theme("s1"), theme("s2")]));
+    check(7, "Theme stop emits var(--spice-button …) in every mode, never a resolved hex",
+      themeCssPerMode.every((c) => c.includes(THEME_COLOUR) && !/#[0-9a-f]{3,8}\b/i.test(c.replaceAll(THEME_COLOUR, ""))),
+      `${MODES.length} modes`);
 
     const fill = songFill();
     check(1, "Song progress bar found", fill && songHandle(), fill ? "" : "nothing matches SCOPE FILL — Spotify's DOM may have changed");
@@ -1258,6 +1397,10 @@
       const varsBefore = barVars(fill); // stylesheet is empty here
       const geometryBefore = barGeometry(fill);
       const waveform = waveformActive();
+      const volumeFills = () => [...document.querySelectorAll(FILL)].filter((f) => !f.matches(`${SCOPE} ${FILL}`));
+      const volumeState = () =>
+        volumeFills().map((f) => `${getComputedStyle(f).backgroundImage} | ${getComputedStyle(f).transform}`).join("; ") || "no other fills";
+      const volumeBefore = volumeState();
       setTestSettings(false, [custom("s1", RED)]);
       const solid = getComputedStyle(fill).backgroundImage;
       check(1, "Solid → song fill has a linear-gradient background-image", solid.startsWith("linear-gradient"), solid);
@@ -1268,28 +1411,48 @@
       const solidHandle = computedHex(songHandle(), "backgroundColor");
       check(6, "Solid → handle is the solid colour", solidHandle === RED, solidHandle);
 
-      setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
-      const cs = getComputedStyle(fill);
-      const transform = cs.getPropertyValue("--progress-bar-transform").trim();
-      const sizeX = cs.backgroundSize.split(" ")[0];
-      check(6, "Gradient → background-size follows --progress-bar-transform",
-        sizeX.endsWith("%") && Math.abs(parseFloat(sizeX) - parseFloat(transform)) < 0.01,
-        `size ${cs.backgroundSize}, transform ${transform}`);
-      check(6, "Gradient → anchored right, no-repeat",
-        cs.backgroundPositionX === "100%" && cs.backgroundRepeat === "no-repeat",
-        `position ${cs.backgroundPosition}, repeat ${cs.backgroundRepeat}`);
-      const img = cs.backgroundImage;
-      const order = ["rgb(255, 0, 0)", "rgb(0, 255, 0)", "rgb(0, 0, 255)"].map((c) => img.indexOf(c));
-      check(6, "Gradient → all stops present, in order", order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1])), img);
-      const lastHandle = computedHex(songHandle(), "backgroundColor");
-      check(6, "Gradient → handle is the last stop", lastHandle === BLUE, lastHandle);
-      check(11, "Bar's --fg-color, --bg-color, --is-active-fg-color untouched", barVars(fill) === varsBefore, barVars(fill));
-      check(12, "Bar height, radius and masks identical with our rules applied", barGeometry(fill) === geometryBefore,
-        barGeometry(fill));
-      if (waveform) {
-        const areas = [...(fill.closest(".progress-bar") ?? fill).querySelectorAll(".x-progressBar-sliderArea")];
-        check(12, "Waveform: both slider areas still masked with a gradient applied", areas.every(hasMaskAnimation),
-          areas.map((a) => getComputedStyle(a).maskImage || getComputedStyle(a).webkitMaskImage).join(" | "));
+      // Every mode against the real song fill, with the same invariants (#15).
+      for (const mode of MODES) {
+        const Mode = MODE_LABELS[mode];
+        setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)], mode);
+        const cs = getComputedStyle(fill);
+        const progress = parseFloat(cs.getPropertyValue("--progress-bar-transform"));
+        const area = fill.closest(".x-progressBar-sliderArea") ?? fill.parentElement;
+        const leftGap = fill.getBoundingClientRect().left - area.getBoundingClientRect().left;
+        const t = fillTransforms(fill);
+        const where = `at ${progress}%: size ${cs.backgroundSize}, position ${cs.backgroundPosition}, repeat ${cs.backgroundRepeat}, ` +
+          `transform ${t.ours} (Spotify's ${t.spotify}), clip-path ${cs.clipPath}, fill left ${leftGap.toFixed(1)} px from its slider area`;
+        if (mode === "compress") {
+          const sizeX = cs.backgroundSize.split(" ")[0];
+          check(6, "Compress → background-size follows --progress-bar-transform",
+            sizeX.endsWith("%") && Math.abs(parseFloat(sizeX) - progress) < 0.01, where);
+          check(6, "Compress → anchored right, no-repeat", cs.backgroundPositionX === "100%" && cs.backgroundRepeat === "no-repeat", where);
+          check(15, "Compress → Spotify's transform intact, no clip-path; below 100 % the fill starts left of its slider area",
+            t.ours === t.spotify && cs.clipPath === "none" && (progress >= 99 || leftGap < -1), where);
+        } else if (mode === "anchored") {
+          check(15, "Anchored → transform none, clip-path inset(…), gradient sized to the whole track",
+            t.ours === "none" && cs.clipPath.startsWith("inset(") && cs.backgroundSize === "100% 100%", where);
+          check(15, "Anchored → the fill's left edge = its slider area's left edge (±1 px)", Math.abs(leftGap) <= 1, where);
+        } else {
+          check(15, "Slide → no background-size/position override, Spotify's transform intact, no clip-path",
+            /^auto( auto)?$/.test(cs.backgroundSize) && cs.backgroundPositionX === "0%" && t.ours === t.spotify && cs.clipPath === "none",
+            where);
+        }
+        const img = cs.backgroundImage;
+        const order = ["rgb(255, 0, 0)", "rgb(0, 255, 0)", "rgb(0, 0, 255)"].map((c) => img.indexOf(c));
+        const lastHandle = computedHex(songHandle(), "backgroundColor");
+        check(6, `${Mode} → all stops in order, handle is the last stop`,
+          order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1])) && lastHandle === BLUE, `${img}; handle ${lastHandle}`);
+        check(11, `${Mode} → bar's --fg-color, --bg-color, --is-active-fg-color untouched`, barVars(fill) === varsBefore, barVars(fill));
+        check(12, `${Mode} → bar height, radius and masks identical with our rules applied`, barGeometry(fill) === geometryBefore,
+          barGeometry(fill));
+        check(1, `${Mode} → volume fill untouched (no background-image, transform unchanged)`,
+          volumeState() === volumeBefore && volumeFills().every((f) => getComputedStyle(f).backgroundImage === "none"), volumeState());
+        if (waveform) {
+          const areas = [...(fill.closest(".progress-bar") ?? fill).querySelectorAll(".x-progressBar-sliderArea")];
+          check(12, `${Mode} → waveform: both slider areas still masked`, areas.every(hasMaskAnimation),
+            areas.map((a) => getComputedStyle(a).maskImage || getComputedStyle(a).webkitMaskImage).join(" | "));
+        }
       }
     }
 
@@ -1413,6 +1576,14 @@
         m.picker.nextElementSibling === m.actions && !m.picker.hidden && getComputedStyle(m.picker).position === "static",
       `after .${m.picker.previousElementSibling?.className}, before .${m.picker.nextElementSibling?.className}, ` +
         `position ${getComputedStyle(m.picker).position}`);
+
+    check(15, "Spread row sits between the Gradient row and the preview: a radiogroup of three radio buttons",
+      m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.preview &&
+        m.modes.getAttribute("role") === "radiogroup" && m.modes.getAttribute("aria-labelledby") === "gpb-spread-label" &&
+        m.modeButtons.length === 3 && m.modeButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") &&
+        m.modeButtons.map((b) => b.textContent).join() === "Compress,Anchored,Slide",
+      `after .${m.spread.previousElementSibling?.className}, before .${m.spread.nextElementSibling?.className}, ` +
+        `buttons ${m.modeButtons.map((b) => `${b.textContent}[${b.getAttribute("role")}]`).join(", ")}`);
 
     // ── Dot menu (#33) ──
     const menuShown = () => !m.menu.hidden && popover?.el === m.menu && m.root.contains(m.menu);
@@ -1829,6 +2000,85 @@
     check(37, "Clicking a dot disarms Reset without resetting; the selection moves",
       isIdle() && JSON.stringify(settings) === armedBase && selectionIs("s2"), `${resetState()}; ${selection()}`);
 
+    // ── Spread row (#15): real clicks and keys; the nodes are only ever updated in place ──
+    const modeNodes = [...m.modeButtons];
+    const modeBtn = (mode) => modeNodes[MODES.indexOf(mode)];
+    const spreadState = () =>
+      `mode ${settings.mode}, gradient ${settings.gradient}, ` +
+      `checked ${modeNodes.filter((b) => b.getAttribute("aria-checked") === "true").map((b) => b.dataset.mode).join() || "none"}, ` +
+      `tabindex ${modeNodes.map((b) => b.tabIndex).join()}, disabled ${modeNodes.map((b) => b.disabled).join()}, ` +
+      `focus ${document.activeElement?.dataset?.mode ?? document.activeElement?.className}, hint "${m.spreadHint.textContent}"`;
+    const spreadShows = (mode, enabled) =>
+      settings.mode === mode && m.spread.isConnected &&
+      [...m.modes.querySelectorAll(".gpb-mode")].every((b, i) => b === modeNodes[i] && b.isConnected) &&
+      modeNodes.every((b) => {
+        const on = b.dataset.mode === mode;
+        return (b.getAttribute("aria-checked") === "true") === on && b.tabIndex === (on ? 0 : -1) && b.disabled === !enabled;
+      }) &&
+      m.spreadHint.textContent === (enabled ? SPREAD_HINTS[mode] : SPREAD_OFF_HINT);
+
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    const dotsBeforeMode = dots();
+    realClick(modeBtn("anchored"));
+    check(15, "Clicking Anchored applies it live (clip-path in the stylesheet), updates the row in place, dots not re-rendered",
+      spreadShows("anchored", true) && styleText().includes("clip-path:") && dots().every((el, i) => el === dotsBeforeMode[i]),
+      spreadState());
+    stillOpen("choosing Anchored");
+    realClick(modeBtn("slide"));
+    check(15, "Clicking Slide → Slide, hint updated in place", spreadShows("slide", true) && !styleText().includes("clip-path:"),
+      spreadState());
+    stillOpen("choosing Slide");
+    await sleep(SAVE_DELAY + 100);
+    const savedMode = JSON.parse(Spicetify.LocalStorage.get(STORAGE_KEY) ?? "{}").mode;
+    check(15, "The chosen mode is saved", savedMode === "slide", `stored mode ${savedMode}`);
+
+    realClick(modeBtn("compress"));
+    modeBtn("compress").focus();
+    const keySteps = [];
+    for (const [key, expected] of [["ArrowRight", "anchored"], ["End", "slide"], ["Home", "compress"], ["ArrowLeft", "slide"]]) {
+      press(document.activeElement, key);
+      keySteps.push(`${key} → ${settings.mode}${settings.mode === expected && document.activeElement === modeBtn(expected) && spreadShows(expected, true) ? "" : ` (expected ${expected} focused)`}`);
+    }
+    const altKept = press(document.activeElement, "ArrowRight", { altKey: true });
+    keySteps.push(`Alt+→ → ${settings.mode}${settings.mode === "slide" && altKept ? "" : " (expected no change)"}`);
+    check(15, "Spread keyboard: →, End, Home and ← (wrapping) change the mode and move focus; Alt+→ doesn't",
+      !keySteps.some((step) => step.includes("expected")), keySteps.join(", "));
+    stillOpen("changing Spread with the keyboard");
+
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
+    const gradientSteps = [];
+    const step = (label, enabled) => gradientSteps.push(`${label}: ${spreadShows("anchored", enabled) ? "ok" : `wrong (${spreadState()})`}`);
+    realClick(m.switchButton);
+    step("switch off", false);
+    realClick(m.switchButton);
+    step("switch on", true);
+    rightClick(dots()[1]);
+    m.removeItem.click();
+    await sleep(20);
+    step("remove to one colour", false);
+    const disabledWithOne = spreadShows("anchored", false) && settings.stops.length === 1;
+    realClick(m.addButton);
+    step("+ Add colour", true);
+    rightClick(dots()[1]);
+    m.removeItem.click();
+    await sleep(20);
+    rightClick(dots()[0]);
+    m.duplicateItem.click();
+    await sleep(20);
+    step("Duplicate", true);
+    check(15, "Row disabled with one colour: buttons disabled, hint 'Applies when the gradient is on.'", disabledWithOne,
+      gradientSteps[2]);
+    check(15, "The Gradient switch, Remove, + Add colour and Duplicate disable/enable the row in place (mode kept)",
+      gradientSteps.every((s) => s.endsWith(": ok")), gradientSteps.join("; "));
+    stillOpen("gradient changes with the Spread row");
+
+    realClick(resetBtn);
+    realClick(resetBtn);
+    check(15, "Reset → Compress (row updated in place, disabled with one colour)", spreadShows("compress", false), spreadState());
+    stillOpen("Reset from Anchored");
+    const base = JSON.parse(armedBase); // back to the Reset checks' settings for the close-and-reopen check
+    setTestSettings(base.gradient, base.stops, base.mode);
+
     realClick(resetBtn);
     const oldLabel = m.resetLabel;
     Spicetify.PopupModal.hide();
@@ -1859,28 +2109,36 @@
       "bad hex": JSON.stringify({ version: 1, gradient: false, stops: [{ id: "s1", kind: "custom", color: "red" }] }),
       "unknown version": JSON.stringify({ version: 99, gradient: false, stops: [theme("s1")] }),
       "9 stops": JSON.stringify({ version: 1, gradient: true, stops: Array.from({ length: 9 }, (_, i) => theme(`s${i}`)) }),
+      "unknown mode": JSON.stringify({ version: 1, gradient: true, mode: "zoom", stops: [theme("s1"), theme("s2")] }),
     };
-    for (const [label, raw] of Object.entries(invalid)) {
+    // loadSettings() with console.warn captured; returns the result and the number of [gpb] warnings.
+    const loadQuietly = (raw) => {
       const warnings = [];
       const warn = console.warn;
       console.warn = (...args) => warnings.push(args.join(" "));
-      let loaded;
       try {
-        loaded = loadSettings(raw);
+        return { loaded: loadSettings(raw), ours: warnings.filter((w) => w.startsWith("[gpb]")).length };
       } finally {
         console.warn = warn;
       }
-      const ours = warnings.filter((w) => w.startsWith("[gpb]")).length;
-      check(2, `Invalid stored settings (${label}) → defaults + exactly one [gpb] warning`,
+    };
+    for (const [label, raw] of Object.entries(invalid)) {
+      const { loaded, ours } = loadQuietly(raw);
+      check(label === "unknown mode" ? 15 : 2, `Invalid stored settings (${label}) → defaults + exactly one [gpb] warning`,
         JSON.stringify(loaded) === JSON.stringify(defaultSettings()) && ours === 1, `${ours} warning(s)`);
     }
+    const legacy = loadQuietly(JSON.stringify({ version: 1, gradient: true, stops: [theme("s1"), custom("s2", RED)] }));
+    check(15, "Stored settings without mode (before v1.2.0) → Compress, no warning",
+      legacy.loaded.mode === "compress" && legacy.loaded.gradient && legacy.loaded.stops.length === 2 && legacy.ours === 0,
+      `${JSON.stringify(legacy.loaded)}, ${legacy.ours} warning(s)`);
 
-    setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s4", BLUE)]);
+    setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s4", BLUE)], "anchored");
     const writtenAtOnce = Spicetify.LocalStorage.get(STORAGE_KEY) === JSON.stringify(settings);
     await new Promise((r) => setTimeout(r, SAVE_DELAY + 100));
     const reloaded = loadSettings();
-    check(2, "Saves are debounced, then a load returns identical settings",
-      !writtenAtOnce && JSON.stringify(reloaded) === JSON.stringify(settings), `written at once ${writtenAtOnce}`);
+    check(2, "Saves are debounced, then a load returns identical settings (mode included)",
+      !writtenAtOnce && JSON.stringify(reloaded) === JSON.stringify(settings) && reloaded.mode === "anchored",
+      `written at once ${writtenAtOnce}, reloaded mode ${reloaded.mode}`);
   }
 
   // ── Diagnostics ─────────────────────────────────────────────────────────────

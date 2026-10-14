@@ -25,7 +25,14 @@ It covers:
 - Exactly one copy of the extension is loaded, and where it came from (Marketplace via jsDelivr, or a local CLI install).
 - Inert by default: empty stylesheet, bar unchanged.
 - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
-- Solid and gradient rendering: Compress-mode sizing, stop order, handle colour.
+- Solid and gradient rendering: stop order and handle colour in every mode.
+- Spread modes (#15), each against the live song fill:
+  - Compress sizes the gradient to the playhead and keeps Spotify's transform;
+  - Anchored has `transform: none`, a `clip-path` inset and the fill's left edge on its slider area's;
+  - Slide has no overrides;
+  - in every mode: volume fill, bar variables, height, radius and waveform masks untouched.
+- Spread lint and data: `transform: none` + `clip-path` only in Anchored's fill rule; solid output identical in all modes; mode saved and reloaded; old settings without a mode load as Compress silently; an unknown mode → defaults + one warning.
+- Spread row: between the Gradient row and the preview; clicks and keys (→, ←, Home, End) change the mode live; updated in place, never re-rendered; disabled with the gradient off or one colour; Reset → Compress; the settings stay open.
 - Theme stop:
   - emitted as a CSS variable;
   - follows runtime `--spice-button` changes;
@@ -65,7 +72,7 @@ Check `__gpb.version` in the console. The Marketplace loads the extension via js
 
 What needs a human (≤ 8 items):
 
-1. Hover, click-seek and drag the bar, solid and gradient → no colour flicker; the whole gradient is visible at roughly 5 %, 50 % and 95 %.
+1. Hover, click-seek and drag the bar, solid and gradient, in each Spread mode → no colour flicker. At roughly 5 %, 50 % and 95 %: *Compress* shows the whole gradient; *Anchored* reveals colours that stay in place; *Slide* slides the gradient in from the left. The playhead end looks the same in all three.
 2. The picker is fully visible, with nothing cut off, also under Hazy.
    - Clicking a dot moves the ring and the picker follows.
    - Dragging in the square and hue bar feels smooth, also when you drag outside the settings.
@@ -73,7 +80,7 @@ What needs a human (≤ 8 items):
    - Right-click a dot → Duplicate / Remove.
    - Drag a dot → a marker shows where it lands and the order changes.
    - Tab to a dot, press Alt+→ → it moves and keeps focus; Spotify doesn't go back or forward.
-3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour; off → plain bar correct.
+3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour, also in *Anchored* (colours fixed in place inside the waveform); off → plain bar correct.
 4. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* Hazy with *Custom color* on → change it and Apply → the bar follows; off → the bar follows the album-art colour across songs.
 5. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
 6. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → bar and modal readable, theme stop falls back sensibly.

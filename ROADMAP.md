@@ -2,10 +2,11 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
-## v1.2.0 — planned
+## v1.2.0 — released 2026-10-14
 
 | # | Issue | Area | Status |
 |---|---|---|---|
+| [#15](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/15) | Gradient modes ("Spread"): Compress / Anchored / Slide | rendering, ui | ✅ |
 
 ## v1.1.0 — released 2026-10-14
 
@@ -59,7 +60,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-v1.2.0 (#15) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
+Nothing is scheduled yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
 
 ## Future
 
@@ -73,6 +74,6 @@ Agreed ideas, not scheduled.
 | [#19](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/19) | Hover behaviour option | |
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
 | [#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21) | Presets and import/export | |
-| [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | needs #15 Anchored (v1.2.0) |
+| [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 | [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |

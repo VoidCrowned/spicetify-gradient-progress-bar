@@ -2,13 +2,14 @@
 
 A [Spicetify](https://spicetify.app) extension that recolours Spotify's song progress bar — one colour, or several blended into a gradient.
 
-> **Status:** released — **v1.0.1**. See the [changelog](CHANGELOG.md) and the [roadmap](ROADMAP.md).
+> **Status:** released — **v1.2.0**. See the [changelog](CHANGELOG.md) and the [roadmap](ROADMAP.md).
 
 ![Gradient Progress Bar: a gradient song progress bar and the settings window with the inline colour picker](preview.png)
 
 ## Features
 
 - **Solid colour or gradient** — start with one colour; add more and the bar becomes a gradient automatically. The gradient always runs from the start of the bar to the playhead, so it looks balanced at any point in the song.
+- **Three ways to spread a gradient** — *Compress* fits the whole gradient between the start and the playhead, *Anchored* keeps the colours fixed to the bar and reveals them as the song plays, *Slide* moves a full-length gradient in with the playhead.
 - **Up to 8 colours**, edited in a built-in colour picker with R/G/B and hex input, reorderable by drag-and-drop.
 - **Theme colour stop** — a colour that follows your theme's accent instead of a fixed value. With themes that change their accent per song (like Hazy's album-art mode), the bar follows along.
 - **Live preview** — changes show on the bar as you pick.
@@ -37,6 +38,7 @@ To uninstall: `spicetify config extensions gradientProgressBar.js-` then `spicet
 - **Use theme colour** in the picker makes the selected colour follow your theme's accent; the button then reads *Following theme colour*. Hover a dot to see whether it's a theme colour.
 - **Right-click a dot** for **Duplicate** and **Remove** (also with the context-menu key or Shift+F10).
 - **+ Add colour** adds another and selects it; with two or more, gradient mode switches on.
+- **Spread** (below the Gradient switch) picks how the gradient covers the bar: *Compress*, *Anchored* or *Slide*. The line below the buttons describes the active one.
 - **Drag the dots** to reorder the gradient. With the keyboard, Alt + arrow keys move the focused colour (Alt + Home / End to the first or last place).
 - **Reset** returns to the default (your theme's own colour, no gradient). It asks for a second click to confirm: the button turns red and reads *Confirm reset?* for 3 seconds; waiting, pressing Escape or clicking anything else cancels.
 

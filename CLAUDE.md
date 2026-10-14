@@ -18,7 +18,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 
 ## Project management
 
-- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0`, `v1.0.1`, `v1.1.0` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
+- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0`, `v1.0.1`, `v1.1.0`, `v1.2.0` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
 - The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release. If `__gpb.version` is old after a release, run it manually: `gh workflow run purge-jsdelivr.yml`.
 - Reference issues in commits (`Closes #6`), one logical change per commit where practical.
 - Ideas that come up during work but aren't in scope: open an issue in the `Future` milestone rather than implementing them.
@@ -124,7 +124,7 @@ Themes may give the dialog `backdrop-filter` or `transform` (Hazy blurs it). Eit
 ## Hard rules
 
 1. **Scope everything** with `SCOPE` (below). The volume bar must never change.
-2. **Never set** `mask`, `height`, `width`, `transform`, `--progress-bar-height`, `--progress-bar-radius`, `--progress-bar-transform`, or any layout property on bar elements. Exception: Anchored mode in #15, once implemented and documented here.
+2. **Never set** `mask`, `height`, `width`, `transform`, `--progress-bar-height`, `--progress-bar-radius`, `--progress-bar-transform`, or any layout property on bar elements. **One exception (#15):** in Anchored mode, the fill rule (`${SCOPE} ${FILL}`) sets `transform: none` and `clip-path: inset(…)` — nowhere else, in no other mode. `cssProblems(css, mode)` in the self-test enforces exactly that.
 3. **Don't override** `--fg-color`, `--bg-color`, `--is-active-fg-color` — themes and extensions read them.
 4. **No `!important`.** Win by specificity: attribute + class ≥ 0,2,0 beats Hazy's 0,1,0. `!important` would also break the waveform's held animations.
 5. **No element references from JS** for the bar. Pure CSS selectors survive React re-renders, other extensions' re-query cycles and Spotify updates.
@@ -141,7 +141,9 @@ const FILL   = '.x-progressBar-fillColor';
 const HANDLE = ':is([data-testid="progress-bar-handle"], .progress-bar__slider, .x-progressBar-handle)';
 ```
 
-**Gradient on — Compress mode** (the default since v1.0.0: full gradient always spans bar start → playhead):
+**Gradient on** — `settings.mode` ("Spread", #15) picks the declarations after `background-image`; the handle is the last stop in every mode.
+
+**Compress** (the default: full gradient always spans bar start → playhead):
 
 ```css
 ${SCOPE} ${FILL} {
@@ -164,17 +166,32 @@ Solid also uses `background-image` so Spotify's hover swap of `background-color`
 
 **Solid with a theme first stop is inert** (empty stylesheet), whether or not unused stops follow — the bar keeps the theme's own colour (`--fg-color`). Decided with the maintainer; it keeps the default state empty (#1).
 
-Other modes (Anchored, Slide) and their CSS are specified in #15.
+**Anchored** (gradient fixed to the track, revealed as the song plays; undoes Spotify's translate and clips at the playhead instead):
+
+```css
+${SCOPE} ${FILL} {
+  background-image: linear-gradient(90deg, <stops>);
+  background-size: 100% 100%;
+  transform: none;
+  clip-path: inset(0 calc(100% - var(--progress-bar-transform)) 0 0 round var(--progress-bar-radius));
+}
+```
+
+It composes with playback-bar-waveform: the waveform's mask is on the parent slider area, our clip-path on the fill. In Anchored the handle colour differs from the colour under the playhead until #22.
+
+**Slide** (the full-track gradient slides in with the fill; only its tail shows early on): `background-image` only, no size, position, transform or clip-path.
+
+Solid output is byte-identical in all three modes; default settings stay inert in every mode.
 
 ## Data model — #2
 
 `Spicetify.LocalStorage`, key `gpb:settings`:
 
 ```json
-{ "version": 1, "gradient": false, "stops": [ { "id": "s1", "kind": "theme" } ] }
+{ "version": 1, "gradient": false, "mode": "compress", "stops": [ { "id": "s1", "kind": "theme" } ] }
 ```
 
-`kind: "theme"` has no `color`; `kind: "custom"` has `"color": "#rrggbb"`. 1–8 stops. Invalid → defaults + one `[gpb]` warning. Apply CSS on every input event; persist debounced (~250 ms).
+`mode` (#15) is `"compress" | "anchored" | "slide"`, optional and additive (schema `version` stays 1): missing → `"compress"` silently (settings saved before v1.2.0), any other value is invalid. Kept while the gradient is off; Reset → `"compress"`. `kind: "theme"` has no `color`; `kind: "custom"` has `"color": "#rrggbb"`. 1–8 stops. Invalid → defaults + one `[gpb]` warning. Apply CSS on every input event; persist debounced (~250 ms).
 
 ## UI behaviour — #3–#5, #7–#10
 
@@ -186,7 +203,8 @@ Other modes (Anchored, Slide) and their CSS are specified in #15.
 - **Colour picker (#32, #35)** — our own, because Chromium's native popup is browser chrome and can't be extended. An **inline panel** between the dots and the action row that always shows the selected stop — not a popover (see *Spicetify PopupModal*). Two columns from 420 px of content (flex-wrap, 202 + 16 + 202 px), stacked below: left the saturation/value square; right the eyedropper (only if `window.EyeDropper` exists), swatch and hue bar, then R/G/B fields, the **hex row** (label `HEX:` and a fixed `10ch` monospace field, about half the column, centred together in the column in both layouts, #36; accepts `#rrggbb`/`rrggbb`/`#rgb`/`rgb`, live, invalid flagged and ignored, normalised on blur) and **Use theme colour** (disabled as *Following theme colour* on a theme stop). Drags use pointer capture, coalesced per animation frame. Editing a theme stop turns it custom. Picker edits update the dot in place and never re-render the dots row.
 - **Dot menu (#33)** — a popover at the cursor: **Duplicate** (copy directly after; a theme stop stays theme; disabled at 8; 1 → 2 turns gradient on) and **Remove** (disabled with 1; down to 1 turns gradient off). Context-menu key / Shift+F10 opens it under the dot; arrows, Home/End, Enter; Tab or Escape close it (focus back on the dot); a click or focus elsewhere closes it.
 - **Popover rules** (the menu is the only popover): rendered **inside the modal root** (`position: fixed`, offset-corrected if an ancestor is transformed) — never in `<body>` (#26). **Hidden, never removed**, so a clicked element is never detached during its own click. Menu actions hide it first, then act. Anything that re-renders the dots row (`renderModal`) closes it first.
-- **Layout (#37)**, top to bottom: Gradient row → preview → dots → picker → **action row** (*+ Add colour* left, *Reset* far right; `justify-content: space-between`) → **help text last**: "Click a colour to edit it below, right-click it to duplicate or remove it. Drag colours to reorder them." No footer, so only Spicetify's own bottom padding is below the help text (self-test: ≤ 24 px). The menu popover's markup sits first in the root (hidden, fixed), so the help text is the root's last child. Spacing (#34): `padding-top: 20px` on the modal root under Spicetify's title bar, and the help text 28 px below the action row; the self-test requires both gaps ≥ 16 px. Max 8 stops; preview strip.
+- **Spread row (#15)** — directly under the Gradient row: label *Spread*, a `role="radiogroup"` of three `role="radio"` buttons *Compress · Anchored · Slide* (`aria-checked`, roving tabindex; ←/→ wrap, Home/End, without modifier keys), and a one-line hint for the active mode (*Applies when the gradient is on.* while it's off, when the buttons are disabled). **No `<select>`** (Hazy styles `select` globally). Built once per open and only updated in place by `renderSpread()` (`aria-checked`, `tabIndex`, `disabled`, hint) — `renderModal()` never replaces it (#26). A mode click calls `setMode()` → `update({ rerender: false })`. The preview keeps showing the full gradient in every mode.
+- **Layout (#37)**, top to bottom: Gradient row → Spread row → preview → dots → picker → **action row** (*+ Add colour* left, *Reset* far right; `justify-content: space-between`) → **help text last**: "Click a colour to edit it below, right-click it to duplicate or remove it. Drag colours to reorder them." No footer, so only Spicetify's own bottom padding is below the help text (self-test: ≤ 24 px). The menu popover's markup sits first in the root (hidden, fixed), so the help text is the root's last child. Spacing (#34): `padding-top: 20px` on the modal root under Spicetify's title bar, and the help text 28 px below the action row; the self-test requires both gaps ≥ 16 px. Max 8 stops; preview strip.
 - **Reset is two-step (#37), no dialog**: the first click (or Enter/Space) only arms it — label *Confirm reset?*, text and border `var(--spice-notification-error, #e91429)` (class `gpb-armed`) — for `RESET_CONFIRM_MS` = 3 s; a second click resets (defaults, first dot selected, label back to *Reset*). It disarms without resetting after 3 s, on Escape (stopped there, so the modal stays), on blur, or on any other pointerdown, click or keydown in the window. Only the label span's text and the class change, never the button node (#26). The label span is `aria-live="polite"`; a hidden copy of *Confirm reset?* in the same grid cell keeps the width fixed. The timer is cleared on close, so reopening shows *Reset*.
 - Theme swatches kept live while the modal is open (MutationObserver on `:root` `style` + `songchange`), disconnected on close.
 - Modal colours only from Spicetify variables.
