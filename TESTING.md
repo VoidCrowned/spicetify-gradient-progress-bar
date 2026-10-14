@@ -66,7 +66,7 @@ It covers:
 
 ## After a release
 
-Check `__gpb.version` in the console. The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release, and a scheduled run every 3 h purges again whenever the CDN's `VERSION` differs from `main`'s. **If the CDN lags after a release, don't purge by hand repeatedly**: repeated purges get throttled, and the scheduled run fixes it. Only if it's urgent, run it once manually after jsDelivr is reachable again: `gh workflow run purge-jsdelivr.yml`.
+Check `__gpb.version` in the console. The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release, and `cdn-heal.yml` runs every 3 h and purges again whenever the CDN's `VERSION` differs from `main`'s. **If the CDN lags after a release, don't purge by hand repeatedly**: repeated purges get throttled, and the scheduled heal fixes it. Only if it's urgent, run it once manually after jsDelivr is reachable again: `gh workflow run purge-jsdelivr.yml`. GitHub switches the heal off after 60 days without repository activity; every push and release switches it back on.
 
 ## Visual checklist
 

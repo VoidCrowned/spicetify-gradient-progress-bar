@@ -19,7 +19,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 ## Project management
 
 - Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0`, `v1.0.1`, `v1.1.0`, `v1.2.0`, `v1.2.1` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
-- The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release, and a scheduled run every 3 h purges again whenever the CDN's `VERSION` differs from `main`'s. **If the CDN lags after a release, don't purge by hand repeatedly**: repeated purges get throttled, and the scheduled run fixes it. Only if it's urgent, run it once manually after jsDelivr is reachable again: `gh workflow run purge-jsdelivr.yml`.
+- The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release, and `cdn-heal.yml` runs every 3 h and purges again whenever the CDN's `VERSION` differs from `main`'s. **If the CDN lags after a release, don't purge by hand repeatedly**: repeated purges get throttled, and the scheduled heal fixes it. Only if it's urgent, run it once manually after jsDelivr is reachable again: `gh workflow run purge-jsdelivr.yml`. GitHub switches the heal off after 60 days without repository activity; every push and release switches it back on.
 - Reference issues in commits (`Closes #6`), one logical change per commit where practical.
 - Ideas that come up during work but aren't in scope: open an issue in the `Future` milestone rather than implementing them.
 - Labels: `enhancement`, `ui`, `rendering`, `compatibility`, `packaging`, `testing`, `documentation`, `bug`.
@@ -40,8 +40,10 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 | `TESTING.md` | Devtools console, self-test coverage, visual checklist (≤ 8 items). |
 | `CONTRIBUTING.md` | Bug reports, Windows dev setup, PR checklist, issue conventions. |
 | `.github/ISSUE_TEMPLATE/bug_report.yml` | Bug report form (theme, versions, extensions, `__gpb` JSON); `config.yml` keeps blank issues enabled. |
-| `.github/workflows/issue-hygiene.yml` | Strips generated footers (issues, comments, milestones), ticks boxes on close. |
-| `.github/workflows/purge-jsdelivr.yml` | Purges jsDelivr `@main` on push and release (each file once), then polls up to 20 min for the new `VERSION` (#39). Throttling and a stale CDN are warnings, not failures; a scheduled run every 3 h re-purges while the CDN differs from `main` (#41). |
+| `.github/workflows/issue-hygiene.yml` | Strips generated footers (issues, comments, milestones), ticks boxes on close. `actions/github-script@v9`. |
+| `.github/workflows/purge-jsdelivr.yml` | Push, release and manual runs only: re-enables `cdn-heal.yml` (on push and release), then purges jsDelivr `@main` (each file once) and polls up to 20 min for the new `VERSION` (#39). Throttling and a stale CDN are warnings, not failures (#41). |
+| `.github/workflows/cdn-heal.yml` | Every 3 h (`23 */3 * * *`) and manually: purges again only while the CDN's `VERSION` differs from `main`'s. A separate file because GitHub disables a whole scheduled workflow after 60 days without activity (#42). |
+| `.github/scripts/purge-jsdelivr.sh` | The purge-and-poll logic both workflows run (`--if-stale` for the heal). |
 | `ROADMAP.md` | Milestones → issues. Keep in sync. |
 | `preview.png` | Marketplace screenshot (#13). |
 
