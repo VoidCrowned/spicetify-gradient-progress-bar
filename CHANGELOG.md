@@ -2,6 +2,13 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.1.0] — 2026-10-14
+
+### Added
+- **Keyboard reordering** ([#24](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/24)): with a colour dot focused, Alt + ← / → moves it one place, Alt + Home / End to the first or last place. The bar, the preview and saving work exactly as with drag-and-drop; focus stays on the moved dot and the selection doesn't change.
+- Screen readers: each dot's label includes its position ("Colour 2 of 3: #ff0000"), and a move is announced ("Moved to position 3 of 3").
+- Dot tooltips mention how to reorder: "Drag or Alt+←/→ to reorder".
+
 ## [1.0.1] — 2026-10-13
 
 ### Fixed

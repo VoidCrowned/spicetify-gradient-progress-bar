@@ -2,6 +2,12 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.1.0 — released 2026-10-14
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#24](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/24) | Keyboard reordering of colour stops (Alt + arrow keys) | ui | ✅ |
+
 ## v1.0.1 — released 2026-10-13
 
 | # | Issue | Area | Status |
@@ -64,6 +70,5 @@ Agreed ideas, not scheduled.
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
 | [#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21) | Presets and import/export | |
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | needs #15 Anchored |
-| [#24](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/24) | Keyboard reordering of colour stops | accessibility gap from #8 |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 | [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |

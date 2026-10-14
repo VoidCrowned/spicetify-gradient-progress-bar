@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 1.0.1
+// VERSION: 1.1.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -16,7 +16,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "1.0.1";
+  const VERSION = "1.1.0";
   // Where this copy was loaded from: the Marketplace (jsDelivr) or the CLI (extensions/).
   // currentScript is only set before the first await, so capture it here (#39).
   const SOURCE = document.currentScript?.src || null;
@@ -314,8 +314,8 @@
   // Hazy looks them up and styles them globally.
   //
   // Dots are plain buttons: click to select one and edit it in the inline colour picker below
-  // (#32, #35), right-click for Duplicate / Remove (#33), drag to reorder (#8). No icons on the
-  // dots (#31). Exactly one dot is selected whenever the modal is open.
+  // (#32, #35), right-click for Duplicate / Remove (#33), drag or Alt+arrows to reorder
+  // (#8, #24). No icons on the dots (#31). Exactly one dot is selected whenever the modal is open.
 
   const MODAL_CSS = `
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; padding-top: 20px; color: var(--spice-text); }
@@ -333,6 +333,7 @@
 .gpb-stop.gpb-selected, .gpb-stop:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 3px; }
 .gpb-stop.gpb-unused { opacity: .5; }
 .gpb-stop.gpb-dragging { opacity: .3; }
+.gpb-announce { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .gpb-marker { position: absolute; width: 2px; height: 32px; border-radius: 1px; background-color: var(--spice-button); pointer-events: none; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
@@ -376,6 +377,7 @@
   // than a container query: inline-size containment could collapse a shrink-to-fit modal.
   const PICKER_COLUMNS_MIN = 420;
 
+  const REORDER_HINT = "Drag or Alt+←/→ to reorder"; // second line of the dot tooltip (#24)
   const HELP_TEXT =
     "Click a colour to edit it below, right-click it to duplicate or remove it. Drag colours to reorder them.";
 
@@ -400,6 +402,7 @@
         <button type="button" role="menuitem" class="gpb-menu-item gpb-duplicate">Duplicate</button>
         <button type="button" role="menuitem" class="gpb-menu-item gpb-remove">Remove</button>
       </div>
+      <span class="gpb-announce" aria-live="polite"></span>
       <div class="gpb-gradient-row">
         <span class="gpb-label" id="gpb-gradient-label">Gradient</span>
         <button type="button" class="gpb-switch" role="switch" aria-labelledby="gpb-gradient-label"></button>
@@ -441,6 +444,7 @@
       resetLabel: root.querySelector(".gpb-reset-label"),
       help: root.querySelector(".gpb-help"),
       menu: root.querySelector(".gpb-menu"),
+      announce: root.querySelector(".gpb-announce"),
       duplicateItem: root.querySelector(".gpb-duplicate"),
       removeItem: root.querySelector(".gpb-remove"),
       picker: root.querySelector(".gpb-colour-picker"),
@@ -475,6 +479,7 @@
     watchThemeColour(m);
     watchPopovers(m);
     enableDragAndDrop(m);
+    enableKeyboardReorder(m);
   }
 
   // ── Two-step Reset (#37) ──
@@ -909,6 +914,28 @@
     row.addEventListener("dragend", endDrag);
   }
 
+  // Alt + ←/→ moves the focused dot one place, Alt + Home/End to the first or last place (#24),
+  // through the same moveStop() as drag-and-drop. The row is re-rendered, so focus goes to the
+  // new node with the same id; the selection doesn't change. Plain arrows, Enter/Space and
+  // Shift+F10 are left alone.
+  function enableKeyboardReorder(m) {
+    m.stopsRow.addEventListener("keydown", (e) => {
+      const el = e.target.closest(".gpb-stop");
+      if (!el || !e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
+      const id = el.dataset.id;
+      const from = settings.stops.findIndex((s) => s.id === id);
+      const last = settings.stops.length - 1;
+      const to = { ArrowLeft: from - 1, ArrowRight: from + 1, Home: 0, End: last }[e.key];
+      if (to === undefined) return;
+      e.preventDefault();
+      e.stopPropagation(); // Alt+←/→ is also Spotify's Back/Forward, even at the edges
+      if (from === -1 || to < 0 || to > last || to === from) return;
+      moveStop(id, to > from ? to + 1 : to); // moveStop takes an insertion point
+      dotEl(id)?.focus();
+      m.announce.textContent = `Moved to position ${to + 1} of ${last + 1}`;
+    });
+  }
+
   // Insertion index under the pointer; the row wraps, so compare line first, then x.
   function dropIndexAt(row, x, y) {
     const stops = [...row.querySelectorAll(".gpb-stop")];
@@ -1029,8 +1056,9 @@
     const isTheme = stop.kind === "theme";
     el.style.backgroundColor = colour;
     el.classList.toggle("gpb-theme", isTheme);
-    el.title = isTheme ? "Theme colour" : colour;
-    el.setAttribute("aria-label", `Colour ${el.dataset.index}: ${isTheme ? "theme colour" : colour}`);
+    const count = settings.stops.length;
+    el.title = (isTheme ? "Theme colour" : colour) + (count > 1 ? `\n${REORDER_HINT}` : "");
+    el.setAttribute("aria-label", `Colour ${el.dataset.index} of ${count}: ${isTheme ? "theme colour" : colour}`);
   }
 
   // ── Self-test ───────────────────────────────────────────────────────────────
@@ -1602,7 +1630,7 @@
     check(11, "Picker: theme dot and picker follow a runtime --spice-button change", swatch === PROBE && pickerSeen === PROBE,
       `dot ${swatch}, picker ${pickerSeen}`);
     check(34, "Theme dots: no dashed ring, 'Theme colour' tooltip",
-      getComputedStyle(themeDot).borderTopStyle !== "dashed" && themeDot.title === "Theme colour",
+      getComputedStyle(themeDot).borderTopStyle !== "dashed" && themeDot.title.split("\n")[0] === "Theme colour",
       `border ${getComputedStyle(themeDot).borderTopStyle}, title "${themeDot.title}"`);
 
     pointer(m.sv, "pointerdown", 0.9, 0.1);
@@ -1692,6 +1720,61 @@
       draggable.map((el) => `${el.tagName.toLowerCase()}.${el.className}`).join(", "));
 
     stillOpen("dragging a stop");
+
+    // ── Keyboard reordering (#24): real keydown events on the dot nodes ──
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    selectStop("s2");
+    const stopOrder = () => settings.stops.map((s) => s.id).join();
+    // Stop order in the bar's gradient: each colour's first occurrence in the stylesheet.
+    const barOrder = () => {
+      const css = styleText();
+      return settings.stops.map((s) => [s.id, css.indexOf(s.color)]).sort((a, b) => a[1] - b[1]).map(([id]) => id).join();
+    };
+    const altKey = (id, key) => press(dotEl(id), key, { altKey: true }); // false if the default was prevented
+    const focusedOn = (id) => !!dotEl(id) && document.activeElement === dotEl(id);
+    const kbState = () =>
+      `order ${stopOrder()}, bar ${barOrder()}, focus ${document.activeElement?.dataset?.id ?? document.activeElement?.className ?? "none"}, ` +
+      `${selection()}, announced "${m.announce.textContent}"`;
+    const moved = (expected, position) =>
+      stopOrder() === expected && barOrder() === expected && focusedOn("s1") && selectionIs("s2") &&
+      m.announce.textContent === `Moved to position ${position} of 3`;
+    const navState = () => `${location.href} ${window.Spicetify?.Platform?.History?.location?.pathname ?? ""}`;
+    const navBefore = navState();
+
+    dotEl("s1").focus();
+    altKey("s1", "ArrowRight");
+    check(24, "Alt+→ on the first of three moves it to position 2; the bar's gradient order follows",
+      stopOrder() === "s2,s1,s3" && barOrder() === "s2,s1,s3", kbState());
+    check(24, "After the move, focus is on the moved dot and the selection is unchanged",
+      focusedOn("s1") && selectionIs("s2"), kbState());
+    check(24, "The new position is announced in a polite live region and the aria-label",
+      m.announce.textContent === "Moved to position 2 of 3" && m.announce.getAttribute("aria-live") === "polite" &&
+        dotEl("s1").getAttribute("aria-label") === `Colour 2 of 3: ${RED}`,
+      `announced "${m.announce.textContent}", aria-label "${dotEl("s1")?.getAttribute("aria-label")}"`);
+    stillOpen("Alt+→ on a dot");
+    altKey("s1", "End");
+    check(24, "Alt+End moves it to last (focus kept, selection unchanged, announced)", moved("s2,s3,s1", 3), kbState());
+    stillOpen("Alt+End on a dot");
+    altKey("s1", "Home");
+    check(24, "Alt+Home moves it back to first (focus kept, selection unchanged, announced)", moved("s1,s2,s3", 1), kbState());
+    stillOpen("Alt+Home on a dot");
+
+    const unmoved = dots();
+    const leftKept = altKey("s1", "ArrowLeft");
+    const rightKept = altKey("s3", "ArrowRight");
+    check(24, "Alt+← on the first dot and Alt+→ on the last change nothing (the keys are still consumed)",
+      stopOrder() === "s1,s2,s3" && dots().every((el, i) => el === unmoved[i]) && !leftKept && !rightKept,
+      `${kbState()}, default prevented ${!leftKept}/${!rightKept}`);
+    stillOpen("Alt+arrows at the edges");
+    dotEl("s1").focus();
+    const plainKept = press(dotEl("s1"), "ArrowRight");
+    check(24, "Plain → without Alt doesn't reorder",
+      stopOrder() === "s1,s2,s3" && dots().every((el, i) => el === unmoved[i]) && plainKept, kbState());
+    check(24, "Every dot's tooltip includes 'Drag or Alt+←/→ to reorder'",
+      dots().every((el) => el.title.endsWith(`\n${REORDER_HINT}`)), dots().map((el) => JSON.stringify(el.title)).join(", "));
+    await sleep(50);
+    check(24, "Alt+arrow keys on a dot don't navigate Spotify (Back/Forward)", navState() === navBefore,
+      `before ${navBefore}, after ${navState()}`);
 
     // ── Two-step Reset (#37): real pointer/mouse sequences and keys on the same button node ──
     const realClick = (el) => {

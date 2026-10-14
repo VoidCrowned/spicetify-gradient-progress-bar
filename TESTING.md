@@ -40,6 +40,7 @@ It covers:
   - Add and Duplicate select the new dot;
   - removing the selected dot selects its neighbour;
   - clicking a dot moves the ring without rebuilding the dots, and a drag never changes it.
+- Keyboard reordering with real key events: Alt+→ / Alt+End / Alt+Home move the focused dot (bar order, focus, unchanged selection, live-region announcement, modal open); nothing happens at the edges or on a plain →; Spotify doesn't navigate.
 - Inline colour picker, driven with real pointer and keyboard events:
   - it sits between the dots and the action row, side by side when there's room;
   - every control is reachable (scrolled into view and hit-tested, so nothing is clipped);
@@ -71,6 +72,7 @@ What needs a human (≤ 8 items):
    - The eyedropper (if shown) picks a colour from the screen without closing the settings.
    - Right-click a dot → Duplicate / Remove.
    - Drag a dot → a marker shows where it lands and the order changes.
+   - Tab to a dot, press Alt+→ → it moves and keeps focus; Spotify doesn't go back or forward.
 3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour; off → plain bar correct.
 4. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* Hazy with *Custom color* on → change it and Apply → the bar follows; off → the bar follows the album-art colour across songs.
 5. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
