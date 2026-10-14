@@ -84,3 +84,4 @@ Agreed ideas, not scheduled.
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 | [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |
+| [#42](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/42) | Workflow maintenance: github-script v9; keep the scheduled CDN heal from disabling the purge | split the heal into its own workflow before a 60-day quiet stretch |
