@@ -344,8 +344,10 @@
   // (#32, #35), right-click for Duplicate / Remove (#33), drag or Alt+arrows to reorder
   // (#8, #24). No icons on the dots (#31). Exactly one dot is selected whenever the modal is open.
 
-  // Tints use color-mix() on var(--spice-button): Hazy rewrites --spice-button at runtime but
-  // leaves --spice-rgb-button at the colour scheme's value (#40).
+  // The selected Spread mode is filled with var(--spice-button), the live theme colour. Never
+  // --spice-rgb-button: Hazy rewrites --spice-button at runtime but leaves --spice-rgb-button
+  // at the colour scheme's value (#40); tints use color-mix() on var(--spice-button) instead.
+  // The label switches to --spice-main (gpb-on-light) when that contrasts more (#43).
   const MODAL_CSS = `
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; padding-top: 20px; color: var(--spice-text); }
 .gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
@@ -360,7 +362,8 @@
 .gpb-spread-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gpb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
 .gpb-mode { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; cursor: pointer; transition: background-color .15s; }
-.gpb-mode[aria-checked="true"] { border-color: var(--spice-button); background-color: color-mix(in srgb, var(--spice-button) 30%, transparent); }
+.gpb-mode[aria-checked="true"] { background-color: var(--spice-button); }
+.gpb-mode.gpb-on-light { color: var(--spice-main); }
 .gpb-mode:hover:not(:disabled):not([aria-checked="true"]) { background-color: rgba(var(--spice-rgb-text), .1); }
 .gpb-mode:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-mode:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
@@ -564,15 +567,57 @@
     });
   }
 
+  // Also called by watchThemeColour(): the label colour depends on the live --spice-button.
   function renderSpread() {
     const on = settings.gradient;
+    const onLight = labelOnLight(modal.modes);
     for (const button of modal.modeButtons) {
       const checked = button.dataset.mode === settings.mode;
       button.setAttribute("aria-checked", String(checked));
       button.tabIndex = checked ? 0 : -1;
       button.disabled = !on;
+      button.classList.toggle("gpb-on-light", checked && onLight);
     }
     modal.spreadHint.textContent = on ? SPREAD_HINTS[settings.mode] : SPREAD_OFF_HINT;
+  }
+
+  // True when --spice-main contrasts more with the live --spice-button than --spice-text (#43).
+  function labelOnLight(el) {
+    const fill = computedRgb(el, "var(--spice-button)");
+    const text = computedRgb(el, "var(--spice-text)");
+    const main = computedRgb(el, "var(--spice-main)");
+    return !!(fill && text && main) && contrast(main, fill) > contrast(text, fill);
+  }
+
+  // The computed sRGB value of a CSS colour, as [r, g, b, a] (0–255, alpha 0–1), or null.
+  // Read through caret-color on one of our own elements, which holds no editable text, so it
+  // has no visible effect. color-mix() converts any colour space to sRGB first.
+  function computedRgb(el, colour) {
+    el.style.setProperty("caret-color", `color-mix(in srgb, ${colour} 100%, transparent)`);
+    const rgb = parseRgb(getComputedStyle(el).caretColor);
+    el.style.removeProperty("caret-color");
+    return rgb;
+  }
+
+  // Computed colours come back as rgb(), rgba() or color(srgb …), with commas or spaces.
+  function parseRgb(colour) {
+    const srgb = /^color\(srgb\s/.test(colour);
+    if (!srgb && !/^rgba?\(/.test(colour)) return null;
+    const n = colour.match(/-?[\d.]+(?:e-?\d+)?/g)?.map(Number) ?? [];
+    if (n.length < 3 || n.some(Number.isNaN)) return null;
+    const rgb = n.slice(0, 3).map((v) => Math.min(255, Math.max(0, srgb ? v * 255 : v)));
+    return [...rgb, n[3] ?? 1];
+  }
+
+  // WCAG 2 relative luminance and contrast ratio (alpha ignored).
+  function luminance([r, g, b]) {
+    const lin = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+
+  function contrast(a, b) {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
   }
 
   // ── Two-step Reset (#37) ──
@@ -1052,9 +1097,11 @@
   }
 
   // Themes like Hazy rewrite --spice-button inline on :root (e.g. on every songchange),
-  // so keep the theme swatches current while the modal is open.
+  // so keep the theme swatches and the Spread label colour (#43) current while the modal is open.
   function watchThemeColour(m) {
     const sync = () => {
+      if (modal !== m) return;
+      renderSpread();
       for (const stop of settings.stops) if (stop.kind === "theme") renderStop(stop);
       const stop = pickerStop();
       if (stop?.kind === "theme") showInPicker(stop, document.activeElement === m.hex ? "hex" : null);
@@ -2026,23 +2073,30 @@
       spreadShows("anchored", true) && styleText().includes("clip-path:") && dots().every((el, i) => el === dotsBeforeMode[i]),
       spreadState());
     stillOpen("choosing Anchored");
-    // Hazy changes --spice-button at runtime; --spice-rgb-button stays stale (#40).
-    const rgba = (colour) => {
-      const n = colour.match(/[\d.]+/g)?.map(Number) ?? [];
-      const [r, g, b] = colour.startsWith("color(") ? n.slice(0, 3).map((v) => v * 255) : n.slice(0, 3); // color-mix() → color(srgb …)
-      return [r, g, b].map(Math.round).concat(n[3] ?? 1);
-    };
-    rootStyle.setProperty("--spice-button", PROBE, "important");
-    await sleep(250); // the button's background-color transition (.15 s)
-    const tint = getComputedStyle(modeBtn("anchored")).backgroundColor;
+    // Hazy changes --spice-button at runtime; --spice-rgb-button stays stale (#40). The checked
+    // button is filled with the live colour, its label in whichever of --spice-text and
+    // --spice-main contrasts more (#43). A dark and a light probe exercise both labels.
+    check(40, "No --spice-rgb-button in the modal CSS (Hazy leaves it stale)", !MODAL_CSS.includes("--spice-rgb-button"),
+      MODAL_CSS.match(/[^\n]*--spice-rgb-button[^\n]*/)?.[0] ?? "not used");
+    const fmt = (rgb) => (rgb ? `rgb(${rgb.slice(0, 3).map(Math.round).join(", ")}${rgb[3] < 1 ? ` / ${rgb[3]}` : ""})` : "unparsed");
+    for (const probe of ["#123456", "#ffe680"]) {
+      rootStyle.setProperty("--spice-button", probe, "important");
+      await sleep(250); // the :root observer, then the button's background-color transition (.15 s)
+      const button = modeBtn("anchored");
+      const bg = parseRgb(getComputedStyle(button).backgroundColor);
+      const label = parseRgb(getComputedStyle(button).color);
+      const options = { "--spice-text": computedRgb(m.modes, "var(--spice-text)"), "--spice-main": computedRgb(m.modes, "var(--spice-main)") };
+      const want = hexToRgb(probe);
+      const [best, bestRgb] = Object.entries(options).sort(([, a], [, b]) => (b ? contrast(b, want) : 0) - (a ? contrast(a, want) : 0))[0];
+      const same = (a, b) => !!(a && b) && a.slice(0, 3).every((v, i) => Math.abs(v - b[i]) <= 1);
+      const ratio = label ? contrast(label, want) : 0;
+      check(43, `Checked Spread button is filled with a runtime --spice-button (${probe}, opaque); its label uses the higher-contrast option, ≥ 4.5:1`,
+        same(bg, want) && bg[3] === 1 && same(label, bestRgb) && label[3] === 1 && ratio >= 4.5,
+        `background ${fmt(bg)}, label ${fmt(label)} (${ratio.toFixed(2)}:1), expected ${best} ${fmt(bestRgb)}; ` +
+          Object.entries(options).map(([k, v]) => `${k} ${v ? contrast(v, want).toFixed(2) : "?"}:1`).join(", "));
+    }
     restoreButton();
     await sleep(250);
-    const [tr, tg, tb, ta] = rgba(tint);
-    const [pr, pg, pb] = rgba(`rgb(${hexToRgb(PROBE).join(", ")})`);
-    check(40, "Checked Spread button follows a runtime --spice-button change (same RGB, about 30 % alpha); no --spice-rgb-button in the modal CSS",
-      Math.abs(tr - pr) <= 1 && Math.abs(tg - pg) <= 1 && Math.abs(tb - pb) <= 1 && Math.abs(ta - 0.3) <= 0.02 &&
-        !MODAL_CSS.includes("--spice-rgb-button"),
-      `background ${tint} with --spice-button ${PROBE}; modal CSS uses --spice-rgb-button: ${MODAL_CSS.includes("--spice-rgb-button")}`);
     realClick(modeBtn("slide"));
     check(15, "Clicking Slide → Slide, hint updated in place", spreadShows("slide", true) && !styleText().includes("clip-path:"),
       spreadState());

@@ -32,7 +32,7 @@ It covers:
   - Slide has no overrides;
   - in every mode: volume fill, bar variables, height, radius and waveform masks untouched.
 - Spread lint and data: `transform: none` + `clip-path` only in Anchored's fill rule; solid output identical in all modes; mode saved and reloaded; old settings without a mode load as Compress silently; an unknown mode → defaults + one warning.
-- Spread row: the selected button's tint follows a runtime `--spice-button` change; between the Gradient row and the preview; clicks and keys (→, ←, Home, End) change the mode live; updated in place, never re-rendered; disabled with the gradient off or one colour; Reset → Compress; the settings stay open.
+- Spread row: the selected button is filled with a runtime `--spice-button` (a dark and a light probe), opaque, its label in the higher-contrast of `--spice-text`/`--spice-main` and ≥ 4.5:1; no `--spice-rgb-button` in the settings CSS; between the Gradient row and the preview; clicks and keys (→, ←, Home, End) change the mode live; updated in place, never re-rendered; disabled with the gradient off or one colour; Reset → Compress; the settings stay open.
 - Theme stop:
   - emitted as a CSS variable;
   - follows runtime `--spice-button` changes;
@@ -81,7 +81,7 @@ What needs a human (≤ 8 items):
    - Drag a dot → a marker shows where it lands and the order changes.
    - Tab to a dot, press Alt+→ → it moves and keeps focus; Spotify doesn't go back or forward.
 3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour, also in *Anchored* (colours fixed in place inside the waveform); off → plain bar correct.
-4. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* Hazy with *Custom color* on → change it and Apply → the bar and the selected Spread button follow; off → the bar follows the album-art colour across songs.
+4. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* Hazy with *Custom color* on → change it and Apply → the bar and the selected Spread button's fill follow, its label stays easy to read; off → the bar follows the album-art colour across songs.
 5. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
 6. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → bar and modal readable, theme stop falls back sensibly.
 7. Reload Spotify → settings persist; a podcast episode and a window resize → no `[gpb]` errors in the console.

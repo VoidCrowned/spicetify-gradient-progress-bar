@@ -6,7 +6,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 
 | # | Issue | Area | Status |
 |---|---|---|---|
-| [#43](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/43) | Spread: fill the selected mode with the theme colour | ui, compatibility | ⏳ |
+| [#43](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/43) | Spread: fill the selected mode with the theme colour | ui, compatibility | ✅ |
 | [#42](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/42) | Workflow maintenance: github-script v9; keep the scheduled CDN heal from disabling the purge | packaging | ⏳ |
 
 ## v1.2.1 — released 2026-10-14
