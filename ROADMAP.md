@@ -2,6 +2,13 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.2.2 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#43](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/43) | Spread: fill the selected mode with the theme colour | ui, compatibility | ⏳ |
+| [#42](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/42) | Workflow maintenance: github-script v9; keep the scheduled CDN heal from disabling the purge | packaging | ⏳ |
+
 ## v1.2.1 — released 2026-10-14
 
 | # | Issue | Area | Status |
@@ -67,7 +74,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-Nothing is scheduled yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
+v1.2.2 (#43, #42) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
 
 ## Future
 
@@ -84,4 +91,3 @@ Agreed ideas, not scheduled.
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 | [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |
-| [#42](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/42) | Workflow maintenance: github-script v9; keep the scheduled CDN heal from disabling the purge | split the heal into its own workflow before a 60-day quiet stretch |
