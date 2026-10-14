@@ -2,6 +2,12 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.2.1] — 2026-10-14
+
+### Fixed
+- **Spread: the selected mode follows your theme colour** ([#40](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/40)). Under Hazy it was tinted with the colour scheme's static accent instead of the live one (for example a green fill inside a purple border). It now uses the live `--spice-button`, so it follows Hazy's *Custom color* and album-art colours.
+- **Marketplace updates reach users even when jsDelivr is slow** ([#41](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/41)). The cache purge after a release no longer fails on jsDelivr throttling or a slow refresh. It waits up to 20 minutes, and a check every 3 hours purges again until the CDN serves the current version.
+
 ## [1.2.0] — 2026-10-14
 
 ### Added
