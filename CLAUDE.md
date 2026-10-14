@@ -18,8 +18,8 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 
 ## Project management
 
-- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0`, `v1.0.1`, `v1.1.0`, `v1.2.0` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
-- The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release. If `__gpb.version` is old after a release, run it manually: `gh workflow run purge-jsdelivr.yml`.
+- Work is tracked as **GitHub issues**, grouped by milestone: `v1.0.0`, `v1.0.1`, `v1.1.0`, `v1.2.0`, `v1.2.1` (released, closed) and `Future`. Releases are tagged `vX.Y.Z` with a GitHub release and a `CHANGELOG.md` entry. `ROADMAP.md` mirrors them — when you close, add or re-scope an issue, update `ROADMAP.md` in the same change.
+- The Marketplace loads the extension via jsDelivr `@main`. `purge-jsdelivr.yml` clears the cache on every push and release, and a scheduled run every 3 h purges again whenever the CDN's `VERSION` differs from `main`'s. **If the CDN lags after a release, don't purge by hand repeatedly**: repeated purges get throttled, and the scheduled run fixes it. Only if it's urgent, run it once manually after jsDelivr is reachable again: `gh workflow run purge-jsdelivr.yml`.
 - Reference issues in commits (`Closes #6`), one logical change per commit where practical.
 - Ideas that come up during work but aren't in scope: open an issue in the `Future` milestone rather than implementing them.
 - Labels: `enhancement`, `ui`, `rendering`, `compatibility`, `packaging`, `testing`, `documentation`, `bug`.
@@ -41,7 +41,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 | `CONTRIBUTING.md` | Bug reports, Windows dev setup, PR checklist, issue conventions. |
 | `.github/ISSUE_TEMPLATE/bug_report.yml` | Bug report form (theme, versions, extensions, `__gpb` JSON); `config.yml` keeps blank issues enabled. |
 | `.github/workflows/issue-hygiene.yml` | Strips generated footers (issues, comments, milestones), ticks boxes on close. |
-| `.github/workflows/purge-jsdelivr.yml` | Purges jsDelivr `@main` on push and release, then checks the CDN serves the new `VERSION` (#39). |
+| `.github/workflows/purge-jsdelivr.yml` | Purges jsDelivr `@main` on push and release (each file once), then polls up to 20 min for the new `VERSION` (#39). Throttling and a stale CDN are warnings, not failures; a scheduled run every 3 h re-purges while the CDN differs from `main` (#41). |
 | `ROADMAP.md` | Milestones → issues. Keep in sync. |
 | `preview.png` | Marketplace screenshot (#13). |
 
