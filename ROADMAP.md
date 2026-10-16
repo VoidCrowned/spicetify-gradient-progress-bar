@@ -2,6 +2,12 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.2.3 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#44](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/44) | Clearer entry icon: brush over a progress bar | ui | ⏳ |
+
 ## v1.2.2 — released 2026-10-14
 
 | # | Issue | Area | Status |
@@ -74,7 +80,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-v1.2.2 (#43, #42) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on Spicetify.
+v1.2.3 (#44) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on the next Spicetify release (root cause and upstream fix noted there).
 
 ## Future
 
