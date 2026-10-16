@@ -23,6 +23,7 @@ It applies test settings through the extension's own code, checks computed style
 
 It covers:
 - Exactly one copy of the extension is loaded, and where it came from (Marketplace via jsDelivr, or a local CLI install).
+- Entry icon (#44): `currentColor`, a 16 × 16 viewBox, no `id=` or `<defs>`; the top-bar icon (when the button is on screen) renders at 16 × 16 px in the button's colour; nested in Spotify's `IconComponent` as the profile menu shows it, it still renders at 16 × 16 px.
 - Inert by default: empty stylesheet, bar unchanged.
 - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
 - Solid and gradient rendering: stop order and handle colour in every mode.

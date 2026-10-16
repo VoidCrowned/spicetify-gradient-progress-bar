@@ -1365,6 +1365,7 @@
         env.copies.length === 1
           ? env.copies[0]
           : `${env.copies.length} copies: ${env.copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions gradientProgressBar.js-), not both.`);
+      await checkEntryIcon(check);
       await runChecks(check, rootStyle, restoreButton);
     } catch (e) {
       check(23, "Self-test ran to completion", false, e?.stack || e);
@@ -1390,6 +1391,76 @@
     const copied = await copyText(JSON.stringify(report, null, 2));
     console.log(copied ? "[gpb] Full report copied to the clipboard." : "[gpb] Couldn't copy the report — it's the return value.");
     return report;
+  }
+
+  // ── Entry icon (#44) ──
+  async function checkEntryIcon(check) {
+    check(44, "Entry icon: currentColor, 16 × 16 viewBox, no id= and no <defs>",
+      ENTRY_ICON.includes("currentColor") && ENTRY_ICON.includes('viewBox="0 0 16 16"') &&
+        !ENTRY_ICON.includes("id=") && !ENTRY_ICON.includes("<defs"),
+      `${ENTRY_ICON.length} characters`);
+
+    // On-screen size of our 16 × 16 viewBox. Not getBoundingClientRect(): for a nested <svg>
+    // that measures the painted shapes, not the viewport.
+    const px = (svg) => {
+      const m = svg?.getScreenCTM?.();
+      return m ? [16 * Math.hypot(m.a, m.b), 16 * Math.hypot(m.c, m.d)] : null;
+    };
+    const size = (svg) => px(svg)?.map((n) => n.toFixed(1)).join(" × ").concat(" px") ?? "not rendered";
+    const is16 = (svg) => !!px(svg)?.every((n) => Math.abs(n - 16) <= 1);
+
+    const button = document.querySelector(`button[aria-label="${ENTRY_LABEL}"]`);
+    const svg = button?.querySelector("svg");
+    if (svg) {
+      const fill = getComputedStyle(svg).fill;
+      const colour = getComputedStyle(button).color;
+      const sameColour = fill === colour || String(parseRgb(fill)) === String(parseRgb(colour));
+      check(44, "Top-bar icon renders at 16 × 16 px and takes the button's colour", is16(svg) && sameColour,
+        `${size(svg)}, fill ${fill}, button colour ${colour}`);
+    } else {
+      check(44, "Top-bar icon renders at 16 × 16 px and takes the button's colour", true,
+        startup.entry?.includes("profile menu")
+          ? "no top-bar button: the profile-menu entry registered instead"
+          : "top-bar button not connected; expected on Spicetify ≤ 2.45.3 until its class-map fix for Spotify 1.3.4 is released (#38)");
+    }
+
+    // The profile menu renders only while it's open, so render the icon the way Spicetify's
+    // createIconComponent() does — our string inside Spotify's IconComponent — off-screen.
+    const Icon = api("ReactComponent")?.IconComponent;
+    const React = api("React");
+    const ReactDOM = api("ReactDOM");
+    if (!Icon || !React || !ReactDOM) {
+      check(44, "Profile-menu icon: nested in Spotify's IconComponent, our <svg> renders at 16 × 16 px", true,
+        "IconComponent, React or ReactDOM not exposed by Spicetify; not measured");
+      return;
+    }
+    const host = document.createElement("div");
+    host.className = "gpb-icon-probe";
+    host.style.cssText = "position: fixed; left: 0; top: 0; visibility: hidden; pointer-events: none";
+    document.body.append(host);
+    let root;
+    try {
+      root = ReactDOM.createRoot?.(host);
+      const icon = React.createElement(Icon, { iconSize: 16, dangerouslySetInnerHTML: { __html: ENTRY_ICON } });
+      if (root) root.render(icon);
+      else ReactDOM.render(icon, host);
+      await sleep(150);
+      const outer = host.querySelector("svg");
+      const inner = outer?.querySelector("svg");
+      check(44, "Profile-menu icon: nested in Spotify's IconComponent, our <svg> renders at 16 × 16 px", is16(inner),
+        inner
+          ? `ours ${size(inner)}; IconComponent ${outer.getBoundingClientRect().width.toFixed(1)} px, viewBox ${outer.getAttribute("viewBox")}`
+          : `no nested <svg>: ${host.innerHTML.slice(0, 120)}`);
+    } catch (e) {
+      check(44, "Profile-menu icon: nested in Spotify's IconComponent, our <svg> renders at 16 × 16 px", false,
+        `rendering IconComponent failed: ${e?.message || e}`);
+    } finally {
+      try {
+        if (root) root.unmount();
+        else ReactDOM.unmountComponentAtNode?.(host);
+      } catch {}
+      host.remove();
+    }
   }
 
   async function runChecks(check, rootStyle, restoreButton) {
@@ -2261,8 +2332,12 @@
   // ── Start-up ────────────────────────────────────────────────────────────────
 
   const ENTRY_LABEL = "Gradient progress bar";
+  // A brush over a progress bar (#44). Monochrome (currentColor follows the theme and hover),
+  // 16 × 16, no <defs> and no ids: ids in inline SVG are document-global. Used as-is by the top
+  // bar (the button's innerHTML) and the profile menu (nested inside Spotify's IconComponent,
+  // the way Spicetify renders its own named icons).
   const ENTRY_ICON =
-    '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M1 7h14v2H1z" opacity=".35"/><path d="M1 7h9v2H1z"/><circle cx="10" cy="8" r="2.5"/></svg>';
+    '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M14.6 1.4a1.3 1.3 0 0 0-1.85 0L7.6 6.55l1.85 1.85 5.15-5.15a1.3 1.3 0 0 0 0-1.85zM6.7 7.5c-1.3 0-2.2 1-2.2 2.3 0 .5-.3.9-.9 1.1 1.5.9 4.3.7 4.9-1.3.1-.4.1-.7 0-1z"/><rect x="0.5" y="12.5" width="15" height="2.5" rx="1.25" opacity=".35"/><rect x="0.5" y="12.5" width="9" height="2.5" rx="1.25"/></svg>';
 
   // The settings always open by right-clicking the song progress bar: one delegated listener,
   // no Spicetify UI wrappers, nothing for a Spotify update to remove. Spicetify's Menu and
@@ -2286,7 +2361,7 @@
   async function registerSpicetifyEntry() {
     if (api("Menu")?.Item) {
       try {
-        new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal).register();
+        new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal, ENTRY_ICON).register();
         return "profile menu"; // items render when the menu opens, so this can't be checked here
       } catch (e) {
         startup.entryErrors.push(`Menu: ${e?.message || e}`);

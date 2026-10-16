@@ -6,7 +6,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 
 | # | Issue | Area | Status |
 |---|---|---|---|
-| [#44](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/44) | Clearer entry icon: brush over a progress bar | ui | ⏳ |
+| [#44](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/44) | Clearer entry icon: brush over a progress bar | ui | ✅ |
 
 ## v1.2.2 — released 2026-10-14
 

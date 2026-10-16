@@ -2,6 +2,11 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.2.3] — 2026-10-16
+
+### Changed
+- **New entry icon: a brush over a progress bar** ([#44](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/44)). The old icon, a thin line with a knob, read as a speck in the top bar. The new one follows your theme's icon colour and hover state, and the profile-menu entry now shows it too, so both entry points look alike. The top-bar button returns for everyone with the next Spicetify release ([#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38)).
+
 ## [1.2.2] — 2026-10-14
 
 ### Changed
