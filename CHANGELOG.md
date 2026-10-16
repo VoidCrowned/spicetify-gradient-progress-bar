@@ -2,6 +2,11 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.2.4] — 2026-10-16
+
+### Fixed
+- **Profile-menu entry works with local installs and never breaks the profile menu** ([#27](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/27)). The entry used to fail as a local (CLI) install because the extension started before Spicetify was ready; it now waits for Spicetify. On Spotify 1.3.4 with Spicetify 2.45.3, a Spicetify bug makes the profile menu fail to open as soon as any extension adds an entry ([spicetify/cli#4012](https://github.com/spicetify/cli/issues/4012)). The entry stays hidden while that bug is present and appears by itself once Spicetify is fixed. Right-clicking the song progress bar always opens the settings.
+
 ## [1.2.3] — 2026-10-16
 
 ### Changed

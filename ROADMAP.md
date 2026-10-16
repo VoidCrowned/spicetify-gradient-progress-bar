@@ -2,6 +2,12 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.2.4 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#27](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/27) | Profile menu registration throws on Spotify 1.3.4.258 — no settings entry | bug, compatibility | ✅ |
+
 ## v1.2.3 — released 2026-10-16
 
 | # | Issue | Area | Status |
@@ -63,7 +69,6 @@ Solid colour or a gradient that always spans bar start → playhead (Compress mo
 | [#23](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/23) | Built-in self-test: `__gpb.selfTest()` | testing | ✅ |
 | [#25](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/25) | Silent start-up hang; re-verify DOM on Spotify 1.3.4.258 | bug, compatibility | ✅ |
 | [#26](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/26) | Removing a colour closes the settings modal | bug, ui | ✅ |
-| [#27](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/27) | Profile menu registration throws on Spotify 1.3.4.258 — no settings entry | bug, compatibility | ✅ |
 | [#28](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/28) | Top-bar button never renders on Spotify 1.3.4.258 — no visible way to open settings | bug, compatibility | ✅ |
 | [#30](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/30) | Hex colour field for the selected colour | ui | ✅ |
 | [#31](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/31) | Labelled actions and help text instead of tiny icons on the dots | ui | ✅ |

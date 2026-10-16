@@ -35,6 +35,9 @@
   const startup = { phase: "waiting for Spicetify", waitingFor: [], entry: null, entryErrors: [], error: null, since: Date.now() };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const api = (name) => window.Spicetify?.[name];
+  // Profile-menu entry state (#27). Up here because status() can run while start-up still waits.
+  let menuRegistered = false;
+  const menuItemVerdicts = new WeakMap(); // MenuItem component → usable?
 
   window.__gpb = {
     version: VERSION,
@@ -1316,6 +1319,7 @@
       entry: startup.entry,
       phase: startup.phase,
       entryErrors: startup.entryErrors,
+      menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() }, // #27; info only, never a check
       startupError: startup.error,
       dom: domProbe(), // includes the song bar's DOM outline, for selector fixes after Spotify updates
     };
@@ -1357,10 +1361,15 @@
     }
 
     try {
-      // The entry point can take up to 20 s to register (profile menu, then top-bar fallback).
+      // The entry point can take up to 20 s to register (up to 15 s for ReactJSX, then the top-bar fallback).
       for (let waited = 0; startup.phase === "registering entry point" && waited < 21000; waited += 300) await sleep(300);
       check(3, "Settings entry registered (profile menu or top bar)", startup.entry,
         [`${startup.entry ?? "none"} (${startup.phase})`, ...startup.entryErrors, startup.error?.split("\n")[0]].filter(Boolean).join("; "));
+      const menuApplicable = !!(api("Menu")?.Item && api("ReactJSX"));
+      check(27, "Menu entry registered without throwing", !menuApplicable || menuRegistered,
+        menuApplicable
+          ? startup.entryErrors.filter((e) => e.startsWith("Menu:")).join("; ") || `registered${menuItemUsable() ? "" : ", hidden while Spicetify's MenuItem is broken (spicetify/cli#4012)"}`
+          : `not applicable: Spicetify.Menu.Item ${api("Menu")?.Item ? "exists" : "missing"}, Spicetify.ReactJSX ${api("ReactJSX") ? "exists" : "missing"}`);
       check(39, "Exactly one copy of the extension is loaded", env.copies.length === 1,
         env.copies.length === 1
           ? env.copies[0]
@@ -2321,7 +2330,8 @@
       entryErrors: startup.entryErrors,
       error: startup.error,
       spotify: window.Spicetify?.Platform?.version ?? null,
-      apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar"].map((n) => [n, !!api(n)])),
+      apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar", "ReactJSX"].map((n) => [n, !!api(n)])),
+      menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() },
       page: location.href,
       dom: domProbe(),
     };
@@ -2357,14 +2367,50 @@
     return "right-click on the progress bar";
   }
 
+  // Spicetify renders its profile-menu items inside Spotify's legacy menu. On Spotify 1.3.4,
+  // Spicetify.ReactComponent.MenuItem resolves to Spotify's V2-only item, which throws "cannot be
+  // rendered outside a collection" there, so with any Spicetify item registered the profile menu
+  // doesn't open at all (spicetify/cli#4012). The V2-only item's source has "forceV2LeadingIcon"
+  // but not "aria-describedby"; Spotify's layout-switching item, the right one, has both.
+  // Unknown shapes count as usable. Cached per component, since shouldAdd runs on every render.
+  function menuItemUsable() {
+    const component = api("ReactComponent")?.MenuItem;
+    if (!component || !["function", "object"].includes(typeof component)) return true;
+    if (!menuItemVerdicts.has(component)) {
+      const fn = typeof component === "function" ? component : component.render ?? component.type?.render ?? component.type;
+      let source = "";
+      try {
+        source = Function.prototype.toString.call(fn);
+      } catch {}
+      menuItemVerdicts.set(component, !(source.includes("forceV2LeadingIcon") && !source.includes("aria-describedby")));
+    }
+    return menuItemVerdicts.get(component);
+  }
+
   // Resolves to a description of the Spicetify entry that is actually on screen, or null.
   async function registerSpicetifyEntry() {
     if (api("Menu")?.Item) {
-      try {
-        new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal, ENTRY_ICON).register();
-        return "profile menu"; // items render when the menu opens, so this can't be checked here
-      } catch (e) {
-        startup.entryErrors.push(`Menu: ${e?.message || e}`);
+      // Menu.Item's constructor calls Spicetify.ReactJSX.jsx() right away, and spicetify-bindings
+      // set ReactJSX only after CLI extensions have started: "reading 'jsx'" (#27). Right-click
+      // on the bar already works, so only this entry waits.
+      for (let waited = 0; !window.Spicetify?.ReactJSX?.jsx && waited < 15000; waited += 250) await sleep(250);
+      if (!window.Spicetify?.ReactJSX?.jsx) {
+        startup.entryErrors.push("Menu: Spicetify.ReactJSX not ready after 15 s");
+      } else {
+        try {
+          const item = new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal, ENTRY_ICON);
+          // On an affected build our entry must never be what breaks the profile menu. shouldAdd
+          // runs on every render, so the entry appears by itself once MenuItem is fixed.
+          const base = item.shouldAdd;
+          item.shouldAdd = (...a) => menuItemUsable() && base(...a);
+          item.register();
+          window.__gpb.menuItem = item;
+          menuRegistered = true;
+          // Items render when the menu opens, so this can't be checked here.
+          return menuItemUsable() ? "profile menu" : "profile menu (hidden while Spicetify's MenuItem is broken)";
+        } catch (e) {
+          startup.entryErrors.push(`Menu: ${e?.message || e}`);
+        }
       }
     }
     if (api("Topbar")?.Button) {
