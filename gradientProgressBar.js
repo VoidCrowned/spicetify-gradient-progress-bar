@@ -37,6 +37,7 @@
   const api = (name) => window.Spicetify?.[name];
   // Profile-menu entry state (#27). Up here because status() can run while start-up still waits.
   let menuRegistered = false;
+  let topbarButton = null; // #45
   const menuItemVerdicts = new WeakMap(); // MenuItem component → usable?
 
   window.__gpb = {
@@ -49,7 +50,7 @@
   };
 
   // Rendering only needs storage; the modal needs PopupModal and Player; the entry point
-  // needs Menu (profile menu) or, as a fallback, Topbar.
+  // extras are the profile menu (Menu) and the top bar (Topbar), both at once (#45).
   const REQUIRED = ["LocalStorage", "PopupModal", "Player"];
   let warned = false;
   while (REQUIRED.some((name) => !api(name))) {
@@ -1320,6 +1321,7 @@
       phase: startup.phase,
       entryErrors: startup.entryErrors,
       menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() }, // #27; info only, never a check
+      topbar: { created: !!topbarButton, connected: !!topbarButton?.element?.isConnected }, // #45
       startupError: startup.error,
       dom: domProbe(), // includes the song bar's DOM outline, for selector fixes after Spotify updates
     };
@@ -1361,7 +1363,7 @@
     }
 
     try {
-      // The entry point can take up to 20 s to register (up to 15 s for ReactJSX, then the top-bar fallback).
+      // The entries can take up to 15 s to register (the profile menu waits for ReactJSX).
       for (let waited = 0; startup.phase === "registering entry point" && waited < 21000; waited += 300) await sleep(300);
       check(3, "Settings entry registered (profile menu or top bar)", startup.entry,
         [`${startup.entry ?? "none"} (${startup.phase})`, ...startup.entryErrors, startup.error?.split("\n")[0]].filter(Boolean).join("; "));
@@ -1370,6 +1372,14 @@
         menuApplicable
           ? startup.entryErrors.filter((e) => e.startsWith("Menu:")).join("; ") || `registered${menuItemUsable() ? "" : ", hidden while Spicetify's MenuItem is broken (spicetify/cli#4012)"}`
           : `not applicable: Spicetify.Menu.Item ${api("Menu")?.Item ? "exists" : "missing"}, Spicetify.ReactJSX ${api("ReactJSX") ? "exists" : "missing"}`);
+      check(45, "Top-bar button created as well, not only as a fallback", !api("Topbar")?.Button || !!topbarButton,
+        !api("Topbar")?.Button
+          ? "not applicable: Spicetify.Topbar.Button missing"
+          : !topbarButton
+            ? startup.entryErrors.filter((e) => e.startsWith("Topbar:")).join("; ") || "not created"
+            : topbarButton.element?.isConnected
+              ? "on screen"
+              : "created, waiting for Spicetify's top bar (#38)");
       check(39, "Exactly one copy of the extension is loaded", env.copies.length === 1,
         env.copies.length === 1
           ? env.copies[0]
@@ -1428,9 +1438,7 @@
         `${size(svg)}, fill ${fill}, button colour ${colour}`);
     } else {
       check(44, "Top-bar icon renders at 16 × 16 px and takes the button's colour", true,
-        startup.entry?.includes("profile menu")
-          ? "no top-bar button: the profile-menu entry registered instead"
-          : "top-bar button not connected; expected on Spicetify ≤ 2.45.3 until its class-map fix for Spotify 1.3.4 is released (#38)");
+        "top-bar button not connected; expected on Spicetify ≤ 2.45.3 until its class-map fix for Spotify 1.3.4 is released (#38)");
     }
 
     // The profile menu renders only while it's open, so render the icon the way Spicetify's
@@ -2332,6 +2340,7 @@
       spotify: window.Spicetify?.Platform?.version ?? null,
       apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar", "ReactJSX"].map((n) => [n, !!api(n)])),
       menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() },
+      topbar: { created: !!topbarButton, connected: !!topbarButton?.element?.isConnected },
       page: location.href,
       dom: domProbe(),
     };
@@ -2350,9 +2359,9 @@
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M14.6 1.4a1.3 1.3 0 0 0-1.85 0L7.6 6.55l1.85 1.85 5.15-5.15a1.3 1.3 0 0 0 0-1.85zM6.7 7.5c-1.3 0-2.2 1-2.2 2.3 0 .5-.3.9-.9 1.1 1.5.9 4.3.7 4.9-1.3.1-.4.1-.7 0-1z"/><rect x="0.5" y="12.5" width="15" height="2.5" rx="1.25" opacity=".35"/><rect x="0.5" y="12.5" width="9" height="2.5" rx="1.25"/></svg>';
 
   // The settings always open by right-clicking the song progress bar: one delegated listener,
-  // no Spicetify UI wrappers, nothing for a Spotify update to remove. Spicetify's Menu and
-  // Topbar are tried as extras — on Spotify 1.3.4.258 the menu throws and the top-bar button
-  // silently never renders (#27, #28), so neither can be the only way in.
+  // no Spicetify UI wrappers, nothing for a Spotify update to remove. Spicetify's profile menu
+  // and top bar are extras — on Spotify 1.3.4.258 / Spicetify 2.45.3 the menu entry has to stay
+  // hidden and the top-bar button never renders (#27, #38), so neither can be the only way in.
   function enableBarContextMenu() {
     document.addEventListener(
       "contextmenu",
@@ -2387,45 +2396,57 @@
     return menuItemVerdicts.get(component);
   }
 
-  // Resolves to a description of the Spicetify entry that is actually on screen, or null.
-  async function registerSpicetifyEntry() {
-    if (api("Menu")?.Item) {
-      // Menu.Item's constructor calls Spicetify.ReactJSX.jsx() right away, and spicetify-bindings
-      // set ReactJSX only after CLI extensions have started: "reading 'jsx'" (#27). Right-click
-      // on the bar already works, so only this entry waits.
-      for (let waited = 0; !window.Spicetify?.ReactJSX?.jsx && waited < 15000; waited += 250) await sleep(250);
-      if (!window.Spicetify?.ReactJSX?.jsx) {
-        startup.entryErrors.push("Menu: Spicetify.ReactJSX not ready after 15 s");
-      } else {
-        try {
-          const item = new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal, ENTRY_ICON);
-          // On an affected build our entry must never be what breaks the profile menu. shouldAdd
-          // runs on every render, so the entry appears by itself once MenuItem is fixed.
-          const base = item.shouldAdd;
-          item.shouldAdd = (...a) => menuItemUsable() && base(...a);
-          item.register();
-          window.__gpb.menuItem = item;
-          menuRegistered = true;
-          // Items render when the menu opens, so this can't be checked here.
-          return menuItemUsable() ? "profile menu" : "profile menu (hidden while Spicetify's MenuItem is broken)";
-        } catch (e) {
-          startup.entryErrors.push(`Menu: ${e?.message || e}`);
-        }
-      }
+  // Both Spicetify entries, independently and at the same time, not one as the other's fallback:
+  // people look for settings in different places (#45). The menu's ReactJSX wait never delays
+  // the top bar. Resolves to a description of what's registered, or null.
+  async function registerSpicetifyEntries() {
+    const entries = await Promise.all([registerMenuEntry(), registerTopbarEntry()]);
+    return entries.filter(Boolean).join(" + ") || null;
+  }
+
+  async function registerMenuEntry() {
+    if (!api("Menu")?.Item) return null;
+    // Menu.Item's constructor calls Spicetify.ReactJSX.jsx() right away, and spicetify-bindings
+    // set ReactJSX only after CLI extensions have started: "reading 'jsx'" (#27). Right-click
+    // on the bar already works, so only this entry waits.
+    for (let waited = 0; !window.Spicetify?.ReactJSX?.jsx && waited < 15000; waited += 250) await sleep(250);
+    if (!window.Spicetify?.ReactJSX?.jsx) {
+      startup.entryErrors.push("Menu: Spicetify.ReactJSX not ready after 15 s");
+      return null;
     }
-    if (api("Topbar")?.Button) {
-      try {
-        const button = new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
-        for (let waited = 0; waited < 4000; waited += 250) {
-          if (button.element?.isConnected || document.querySelector(`button[aria-label="${ENTRY_LABEL}"]`))
-            return "top bar button";
-          await sleep(250);
-        }
-        startup.entryErrors.push("Topbar: button created but never rendered");
-      } catch (e) {
-        startup.entryErrors.push(`Topbar: ${e?.message || e}`);
-      }
+    try {
+      const item = new Spicetify.Menu.Item(ENTRY_LABEL, false, openModal, ENTRY_ICON);
+      // On an affected build our entry must never be what breaks the profile menu. shouldAdd
+      // runs on every render, so the entry appears by itself once MenuItem is fixed.
+      const base = item.shouldAdd;
+      item.shouldAdd = (...a) => menuItemUsable() && base(...a);
+      item.register();
+      window.__gpb.menuItem = item;
+      menuRegistered = true;
+      // Items render when the menu opens, so this can't be checked here.
+      return menuItemUsable() ? "profile menu" : "profile menu (hidden while Spicetify's MenuItem is broken)";
+    } catch (e) {
+      startup.entryErrors.push(`Menu: ${e?.message || e}`);
+      return null;
     }
+  }
+
+  // One button at most. One that isn't on screen yet stays registered: Spicetify keeps it and
+  // mounts it once it finds its top bar (#38).
+  async function registerTopbarEntry() {
+    if (!api("Topbar")?.Button || topbarButton) return null;
+    try {
+      topbarButton = new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
+      window.__gpb.topbarButton = topbarButton;
+    } catch (e) {
+      startup.entryErrors.push(`Topbar: ${e?.message || e}`);
+      return null;
+    }
+    for (let waited = 0; waited < 4000; waited += 250) {
+      if (topbarButton.element?.isConnected) return "top bar button";
+      await sleep(250);
+    }
+    startup.entryErrors.push("Topbar: button created, not on screen yet (Spicetify hasn't found its top bar, #38)");
     return null;
   }
 
@@ -2437,7 +2458,7 @@
     window.__gpb = { version: VERSION, status: () => statusReport(), selfTest, open: () => modal || openModal() };
     startup.entry = enableBarContextMenu();
     startup.phase = "registering entry point";
-    const extra = await registerSpicetifyEntry();
+    const extra = await registerSpicetifyEntries();
     if (extra) startup.entry += ` + ${extra}`;
     startup.phase = "ready";
     console.log(`[gpb] v${VERSION} ready — open the settings with a ${startup.entry}.`);

@@ -2,6 +2,12 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.2.5 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#45](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/45) | Top-bar button and profile-menu entry at the same time, not as a fallback | enhancement, compatibility | ✅ |
+
 ## v1.2.4 — released 2026-10-16
 
 | # | Issue | Area | Status |
@@ -102,4 +108,3 @@ Agreed ideas, not scheduled.
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 | [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |
-| [#45](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/45) | Top-bar button while the profile-menu entry is hidden by the MenuItem guard | came up in #27 (v1.2.4) |

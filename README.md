@@ -32,7 +32,7 @@ To uninstall: `spicetify config extensions gradientProgressBar.js-` then `spicet
 
 ## Usage
 
-**Right-click the song progress bar** to open the settings. Where Spicetify supports it, there's also a profile-menu entry or a top-bar button, both with a **brush icon** (a brush over a progress bar; see [Troubleshooting](#troubleshooting)).
+**Right-click the song progress bar** to open the settings. Where Spicetify supports it, there's also a profile-menu entry and a top-bar button, both with a **brush icon** (a brush over a progress bar; see [Troubleshooting](#troubleshooting)).
 
 - **Click a colour dot** to select it (it gets a ring) and edit it in the colour picker below the dots: drag in the square and the hue bar, use the eyedropper (where available), or type R/G/B values or a **hex code** (`#8372fd`, `8372fd` or `#87f`). Changes show on the bar as you go. With the keyboard, Enter or Space on a dot selects it and jumps to the hex field.
 - **Use theme colour** in the picker makes the selected colour follow your theme's accent; the button then reads *Following theme colour*. Hover a dot to see whether it's a theme colour.

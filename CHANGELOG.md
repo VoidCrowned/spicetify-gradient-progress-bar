@@ -2,6 +2,11 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.2.5] — 2026-10-16
+
+### Changed
+- **Top-bar button and profile-menu entry, both at the same time** ([#45](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/45)). Until now the top-bar button was only a fallback when the profile-menu entry couldn't be added, so since 1.2.4 it never appeared. Both are now added, so the settings are wherever you look first. Spicetify 2.45.3 can't show top-bar buttons on Spotify 1.3.4 ([#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38)); ours appears by itself once Spicetify is fixed. Right-clicking the song progress bar always works.
+
 ## [1.2.4] — 2026-10-16
 
 ### Fixed

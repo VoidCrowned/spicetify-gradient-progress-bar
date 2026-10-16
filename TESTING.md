@@ -24,6 +24,7 @@ It applies test settings through the extension's own code, checks computed style
 It covers:
 - Exactly one copy of the extension is loaded, and where it came from (Marketplace via jsDelivr, or a local CLI install).
 - Profile-menu entry (#27): registered without throwing when `Spicetify.Menu.Item` and `Spicetify.ReactJSX` exist. Whether Spicetify's `MenuItem` is usable (`menuItemUsable`) is reported in the environment block only, never as a failure.
+- Top-bar button (#45): created as well as the profile-menu entry, not as a fallback; on screen or still waiting for Spicetify's top bar (#38).
 - Entry icon (#44): `currentColor`, a 16 × 16 viewBox, no `id=` or `<defs>`; the top-bar icon (when the button is on screen) renders at 16 × 16 px in the button's colour; nested in Spotify's `IconComponent` as the profile menu shows it, it still renders at 16 × 16 px.
 - Inert by default: empty stylesheet, bar unchanged.
 - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.
@@ -86,7 +87,7 @@ What needs a human (≤ 8 items):
 4. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* Hazy with *Custom color* on → change it and Apply → the bar and the selected Spread button's fill follow, its label stays easy to read; off → the bar follows the album-art colour across songs.
 5. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.
 6. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → bar and modal readable, theme stop falls back sensibly.
-7. Reload Spotify → settings persist; the profile menu opens, and our entry shows with its icon when `__gpb.status().menu.menuItemUsable` is true and is absent when it's false; a podcast episode and a window resize → no `[gpb]` errors in the console.
+7. Reload Spotify → settings persist; the profile menu opens, and our entry shows with its icon when `__gpb.status().menu.menuItemUsable` is true and is absent when it's false; the brush button shows in the top bar wherever Spicetify's top bar works (#38); a podcast episode and a window resize → no `[gpb]` errors in the console.
 8. Reset → *Confirm reset?* (red) → a second click resets; waiting 3 s or clicking elsewhere cancels.
 
 Add a self-test check (preferred) or a visual item whenever a fix addresses something neither layer covered yet.
