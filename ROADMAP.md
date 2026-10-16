@@ -2,7 +2,7 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
-## v1.2.5 — planned
+## v1.2.5 — released 2026-10-16
 
 | # | Issue | Area | Status |
 |---|---|---|---|
