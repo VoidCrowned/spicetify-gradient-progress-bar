@@ -99,8 +99,6 @@ Agreed ideas, not scheduled.
 
 | # | Issue | Notes |
 |---|---|---|
-| [#16](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/16) | Gradient direction / angle | |
-| [#17](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/17) | Per-stop opacity | ties into #19 |
 | [#18](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/18) | Custom stop positions | schema v2; requested again — drag stops along the preview strip |
 | [#19](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/19) | Hover behaviour option | |
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
@@ -108,3 +106,12 @@ Agreed ideas, not scheduled.
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 | [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |
+
+## Not planned
+
+Ideas that were considered and dropped.
+
+| # | Issue | Why |
+|---|---|---|
+| [#16](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/16) | Gradient direction / angle | The bar is only a few pixels tall, so any angle other than left → right is barely visible; it would also complicate every Spread mode's sizing. |
+| [#17](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/17) | Per-stop opacity | A darker or lighter colour gives the same look without the complexity of semi-transparent stops over the track and hover backgrounds. |
