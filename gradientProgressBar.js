@@ -555,6 +555,7 @@
     enableReset(m);
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
+    evenPopupBottom(root);
     modal = m;
     selectedId = settings.stops[0].id; // the first dot is selected on open
     renderModal();
@@ -563,6 +564,19 @@
     watchPopovers(m);
     enableDragAndDrop(m);
     enableKeyboardReorder(m);
+  }
+
+  // Spicetify pads the popup's content 0 24px 24px, but the popup also carries Spotify's
+  // track-credits classes, and themes style those: Hazy gives .main-trackCreditsModal-container
+  // padding-bottom: 32px, so there were 56 px below the help text against 24 px at the sides
+  // (#48). Inline, on this display()'s elements only: PopupModal rebuilds its markup on every
+  // display(), so no other extension's popup is affected. Never a global rule.
+  function evenPopupBottom(root) {
+    const content = root.closest(".spicetify-popup-content");
+    const container = root.closest(".spicetify-popup-container");
+    if (!content || !container) return;
+    container.style.paddingBottom = "0px";
+    content.style.paddingBottom = getComputedStyle(content).paddingLeft;
   }
 
   // ── Spread (#15) ──
@@ -1810,17 +1824,29 @@
       `centres differ ${plusCentreDiff.toFixed(1)} px, gap ${plusGap.toFixed(1)} px, ` +
         `+ ${plusRect.width.toFixed(1)}×${plusRect.height.toFixed(1)}, dot ${dotRect.width.toFixed(1)}×${dotRect.height.toFixed(1)}`);
     check(37, "Action row → help text gap is ≥ 16 px", helpGap >= 16, `${helpGap.toFixed(1)} px`);
-    // The content's bottom inside Spicetify's container (scroll-aware, its own padding excluded):
-    // anything more than a small gap below the help text is empty space of ours.
-    const container = m.root.parentElement;
-    const containerStyle = getComputedStyle(container);
-    const contentBottom = container.getBoundingClientRect().top + container.clientTop - container.scrollTop +
-      container.scrollHeight - parseFloat(containerStyle.paddingBottom || "0");
-    const helpBottom = help.getBoundingClientRect().bottom;
-    const bottomGap = contentBottom - helpBottom;
-    check(37, "Help text bottom → modal content bottom is ≤ 24 px (no empty footer)", bottomGap <= 24,
-      `${bottomGap.toFixed(1)} px (help → our root's bottom ${(m.root.getBoundingClientRect().bottom - helpBottom).toFixed(1)} px, ` +
-        `container <${container.tagName.toLowerCase()}> padding-bottom ${containerStyle.paddingBottom})`);
+    // ── Bottom margin (#48): help text → the dialog's bottom edge ≈ our root → its left edge ──
+    // Scrolled to the end; every ancestor's share of the bottom gap goes into the detail.
+    const dialog = m.root.closest(".GenericModal");
+    const scroller = m.root.closest(".spicetify-popup-content");
+    const scrollBefore = scroller?.scrollTop ?? 0;
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    const chain = [help];
+    for (let el = help.parentElement; dialog && el && chain[chain.length - 1] !== dialog; el = el.parentElement) chain.push(el);
+    const bottom = (el) => el.getBoundingClientRect().bottom;
+    const bottomGap = dialog ? bottom(dialog) - bottom(help) : NaN;
+    const sideGap = dialog ? m.root.getBoundingClientRect().left - dialog.getBoundingClientRect().left : NaN;
+    const nameOf = (el) => (el === m.root ? "our root" : el.classList[0] ? `.${el.classList[0]}` : `<${el.tagName.toLowerCase()}>`);
+    const shares = chain.slice(1).map((el, i) => {
+      const cs = getComputedStyle(el);
+      return `${nameOf(el)} ${(bottom(el) - bottom(chain[i])).toFixed(1)} (padding ${cs.paddingBottom}, border ${cs.borderBottomWidth}, ` +
+        `${nameOf(chain[i])} margin ${getComputedStyle(chain[i]).marginBottom})`;
+    });
+    if (scroller) scroller.scrollTop = scrollBefore;
+    check(48, "Space below the help text matches the sides (≤ 4 px), to the dialog's edges, scrolled to the end",
+      Math.abs(bottomGap - sideGap) <= 4,
+      dialog
+        ? `bottom ${bottomGap.toFixed(1)} px, side ${sideGap.toFixed(1)} px; help line-height ${getComputedStyle(help).lineHeight}; ${shares.join(" · ")}`
+        : "dialog (.GenericModal) not found");
 
     const cursor = rightClick(dots()[1]);
     const mr = m.menu.getBoundingClientRect();
@@ -2326,6 +2352,13 @@
       `${observersOpen} → ${liveObservers}`);
     check(11, "Nothing of ours left in the page after close (Hazy Settings can open cleanly)",
       !document.querySelector(".gpb-modal, .gpb-stop, .gpb-switch"), "");
+    // Another extension's popup is rebuilt by display(), so our inline padding fix is gone (#48).
+    Spicetify.PopupModal.display({ title: "gpb self-test", content: document.createElement("p") });
+    const otherPopup = [".spicetify-popup-container", ".spicetify-popup-content"]
+      .map((sel) => Spicetify.PopupModal.querySelector(sel)?.getAttribute("style") ?? null);
+    Spicetify.PopupModal.hide();
+    check(48, "The next popup (another extension's) has none of our inline padding",
+      otherPopup.every((style) => !style), `container style "${otherPopup[0] ?? ""}", content style "${otherPopup[1] ?? ""}"`);
 
     // ── Persistence ──
     const invalid = {

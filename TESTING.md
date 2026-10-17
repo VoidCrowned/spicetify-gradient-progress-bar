@@ -64,6 +64,7 @@ It covers:
   - Duplicate (a theme colour stays a theme colour) and Remove, and both disabled states;
   - keyboard use.
 - The settings stay open after every picker and menu action; spacing under the title and above the help text.
+- Bottom margin (#48): with the content scrolled to the end, the space below the help text matches the side margin (within 4 px, to the dialog's edges); the detail lists each ancestor's share. The next popup opened by any extension has none of our inline padding.
 - Modal clean-up: listeners and observers removed on close, no clashes with Hazy's ids and classes.
 - Settings: invalid saved settings fall back to defaults with one warning; saves are debounced and survive a save–load round trip.
 - Bar size, radius and waveform masks unchanged.
