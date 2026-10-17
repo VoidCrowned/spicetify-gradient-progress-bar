@@ -99,7 +99,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-v1.3.0 (#46, #47, #48) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on the next Spicetify release (root cause and upstream fix noted there).
+Nothing is planned after v1.3.0 yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on the next Spicetify release (root cause and upstream fix noted there).
 
 ## Future
 
