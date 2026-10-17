@@ -6,7 +6,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 
 | # | Issue | Area | Status |
 |---|---|---|---|
-| [#49](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/49) | Stepper (−\|+) after the colour dots; Delete/Backspace removes a focused dot | ui | ⏳ |
+| [#49](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/49) | Stepper (−\|+) after the colour dots; Delete/Backspace removes a focused dot | ui | ✅ |
 
 ## v1.3.0 — released 2026-10-17
 

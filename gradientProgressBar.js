@@ -345,7 +345,9 @@
   //
   // Dots are plain buttons: click to select one and edit it in the inline colour picker below
   // (#32, #35), right-click for Duplicate / Remove (#33), drag or Alt+arrows to reorder
-  // (#8, #24). No icons on the dots (#31). Exactly one dot is selected whenever the modal is open.
+  // (#8, #24), Delete/Backspace to remove (#49). No icons on the dots (#31). Exactly one dot is
+  // selected whenever the modal is open. The −|+ stepper after them removes the selected dot
+  // and adds one (#49).
 
   // The selected Spread mode is filled with var(--spice-button), the live theme colour. Never
   // --spice-rgb-button: Hazy rewrites --spice-button at runtime but leaves --spice-rgb-button
@@ -378,10 +380,13 @@
 .gpb-stop.gpb-unused { opacity: .5; }
 .gpb-stop.gpb-dragging { opacity: .3; }
 .gpb-announce { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.gpb-plus { flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 32px; height: 32px; margin: 4px 0; padding: 0; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 50%; background: none; color: var(--spice-subtext); cursor: pointer; }
-.gpb-plus:hover:not(:disabled) { color: var(--spice-text); }
-.gpb-plus:disabled { opacity: .5; cursor: not-allowed; }
-.gpb-plus:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 3px; }
+.gpb-stepper { flex: none; display: flex; box-sizing: border-box; height: 32px; margin: 4px 0; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 16px; overflow: hidden; }
+.gpb-step { display: flex; align-items: center; justify-content: center; width: 34px; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; color: var(--spice-subtext); cursor: pointer; }
+.gpb-step:hover:not(:disabled) { color: var(--spice-text); }
+.gpb-step:disabled { cursor: not-allowed; }
+.gpb-step:disabled > svg { opacity: .5; }
+.gpb-step:focus-visible { outline: 2px solid var(--spice-text); outline-offset: -3px; }
+.gpb-step-divider { flex: none; width: 1px; background-color: rgba(var(--spice-rgb-text), .3); }
 .gpb-marker { position: absolute; width: 2px; height: 32px; border-radius: 1px; background-color: var(--spice-button); pointer-events: none; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
@@ -435,10 +440,14 @@
 
   const REORDER_HINT = "Drag or Alt+←/→ to reorder"; // second line of the dot tooltip (#24)
   const HELP_TEXT =
-    "Click a colour to edit it below, right-click it to duplicate or remove it. Drag colours to reorder them.";
+    "Click a colour to edit it, drag to reorder, right-click to duplicate. + adds a colour, − removes the selected one.";
   const HELP_RESET = "Reset goes back to a single colour that follows your theme."; // the help's second line (#47)
   const ADD_LABEL = "Add colour";
   const ADD_FULL_LABEL = `Up to ${MAX_STOPS} colours`;
+  const REMOVE_LABEL = "Remove selected colour"; // the stepper's − (#49)
+  const REMOVE_LAST_LABEL = "At least one colour";
+  const MINUS_ICON =
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2 7.25h12v1.5H2z"/></svg>';
   const PLUS_ICON =
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 2h1.5v5.25H14v1.5H8.75V14h-1.5V8.75H2v-1.5h5.25z"/></svg>';
 
@@ -480,7 +489,11 @@
       <div class="gpb-preview"></div>
       <div class="gpb-dots">
         <div class="gpb-stops"></div>
-        <button type="button" class="gpb-plus" aria-label="${ADD_LABEL}" title="${ADD_LABEL}">${PLUS_ICON}</button>
+        <div class="gpb-stepper" role="group" aria-label="Colours">
+          <button type="button" class="gpb-step gpb-minus" aria-label="${REMOVE_LABEL}" title="${REMOVE_LABEL}">${MINUS_ICON}</button>
+          <span class="gpb-step-divider" aria-hidden="true"></span>
+          <button type="button" class="gpb-step gpb-plus" aria-label="${ADD_LABEL}" title="${ADD_LABEL}">${PLUS_ICON}</button>
+        </div>
       </div>
       <div class="gpb-colour-picker" role="group" aria-label="Selected colour">
         <div class="gpb-sv" role="slider" tabindex="0" aria-label="Saturation and brightness"><div class="gpb-sv-handle"></div></div>
@@ -515,6 +528,8 @@
       preview: root.querySelector(".gpb-preview"),
       dotsLine: root.querySelector(".gpb-dots"),
       stopsRow: root.querySelector(".gpb-stops"),
+      stepper: root.querySelector(".gpb-stepper"),
+      minusButton: root.querySelector(".gpb-minus"),
       plusButton: root.querySelector(".gpb-plus"),
       actions: root.querySelector(".gpb-actions"),
       resetButton: root.querySelector(".gpb-reset"),
@@ -539,12 +554,18 @@
 
     m.switchButton.addEventListener("click", toggleGradient);
     enableSpread(m);
-    // Outside .gpb-stops, which renderStops() empties: the clicked + is never detached (#26, #47).
-    m.plusButton.addEventListener("click", () => {
-      const hadFocus = document.activeElement === m.plusButton;
-      addStop();
-      if (hadFocus && m.plusButton.disabled) dotEl(selectedId)?.focus({ preventScroll: true }); // at 8 it's disabled
-    });
+    // The −|+ stepper sits outside .gpb-stops, which renderStops() empties, so a clicked half is
+    // never detached (#26, #47). − is the dot menu's Remove on the selected dot (#49). Focus stays
+    // on the clicked half; once that half is disabled (− at one colour, + at eight), it goes to
+    // the selected dot.
+    const stepper = (button, action) =>
+      button.addEventListener("click", () => {
+        const hadFocus = document.activeElement === button;
+        action();
+        if (hadFocus && button.disabled) dotEl(selectedId)?.focus({ preventScroll: true });
+      });
+    stepper(m.minusButton, () => removeStop(selectedId));
+    stepper(m.plusButton, addStop);
     m.stopsRow.addEventListener("click", (e) => {
       const el = e.target.closest(".gpb-stop");
       if (!el || performance.now() - lastDragEnd < 300) return; // a drag never changes the selection
@@ -564,6 +585,7 @@
     watchPopovers(m);
     enableDragAndDrop(m);
     enableKeyboardReorder(m);
+    enableKeyboardRemove(m);
   }
 
   // Spicetify pads the popup's content 0 24px 24px, but the popup also carries Spotify's
@@ -1042,7 +1064,7 @@
     });
   }
 
-  const STOP_GAP = 14; // matches .gpb-stops gap; .gpb-dots' 10 px gap + its 4 px padding put the + as far away (#47)
+  const STOP_GAP = 14; // matches .gpb-stops gap; .gpb-dots' 10 px gap + its 4 px padding put the stepper as far away (#47, #49)
 
   // The dots are buttons, so dragging never fights a native colour input (#8, #31).
   function enableDragAndDrop(m) {
@@ -1105,6 +1127,24 @@
       moveStop(id, to > from ? to + 1 : to); // moveStop takes an insertion point
       dotEl(id)?.focus();
       m.announce.textContent = `Moved to position ${to + 1} of ${last + 1}`;
+    });
+  }
+
+  // Delete or Backspace on a focused dot removes that dot (#49) through the same removeStop() as
+  // the dot menu and −, so the selection rule (#35) applies. Focus goes to the dot now at its
+  // index. With one colour nothing is removed, but the key is still consumed. On .gpb-stops, so
+  // Backspace in the picker's text fields keeps editing text.
+  function enableKeyboardRemove(m) {
+    m.stopsRow.addEventListener("keydown", (e) => {
+      const el = e.target.closest(".gpb-stop");
+      if (!el || (e.key !== "Delete" && e.key !== "Backspace") || e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const index = settings.stops.findIndex((s) => s.id === el.dataset.id);
+      if (index === -1 || settings.stops.length <= 1) return;
+      removeStop(el.dataset.id);
+      dotEl(settings.stops[Math.min(index, settings.stops.length - 1)].id)?.focus();
+      m.announce.textContent = `Colour removed, ${settings.stops.length} left`;
     });
   }
 
@@ -1184,9 +1224,11 @@
     renderPreview();
     renderStops();
     showInPicker(findStop(selectedId));
-    const full = settings.stops.length >= MAX_STOPS;
-    modal.plusButton.disabled = full;
-    modal.plusButton.title = full ? ADD_FULL_LABEL : ADD_LABEL;
+    const count = settings.stops.length;
+    modal.plusButton.disabled = count >= MAX_STOPS;
+    modal.plusButton.title = count >= MAX_STOPS ? ADD_FULL_LABEL : ADD_LABEL;
+    modal.minusButton.disabled = count <= 1;
+    modal.minusButton.title = count <= 1 ? REMOVE_LAST_LABEL : REMOVE_LABEL;
   }
 
   // In place, never replaced: focus stays on the switch when it adds a colour (#26, #46).
@@ -1751,12 +1793,21 @@
       help.textContent === HELP_TEXT + HELP_RESET && help.querySelectorAll("br").length === 1 && m.root.lastElementChild === help &&
         m.actions.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING && !m.root.querySelector(".gpb-footer"),
       `last child .${m.root.lastElementChild?.className}, text "${help.innerText ?? help.textContent}"`);
-    check(47, "+ button replaces + Add colour: no .gpb-add left; outside .gpb-stops, right after it; not draggable",
-      !m.root.querySelector(".gpb-add") && m.actions.children.length === 1 && m.actions.firstElementChild === m.resetButton &&
-        !m.stopsRow.contains(m.plusButton) && m.stopsRow.nextElementSibling === m.plusButton && !m.plusButton.draggable &&
-        m.plusButton.getAttribute("aria-label") === ADD_LABEL && m.plusButton.title === ADD_LABEL && !m.plusButton.disabled,
-      `.gpb-add ${!!m.root.querySelector(".gpb-add")}, action row [${[...m.actions.children].map((el) => `.${el.className}`).join(", ")}], ` +
-        `+ after .${m.plusButton.previousElementSibling?.className}, label "${m.plusButton.getAttribute("aria-label")}", title "${m.plusButton.title}"`);
+    check(47, "No + Add colour button left; Reset alone in the action row",
+      !m.root.querySelector(".gpb-add") && m.actions.children.length === 1 && m.actions.firstElementChild === m.resetButton,
+      `.gpb-add ${!!m.root.querySelector(".gpb-add")}, action row [${[...m.actions.children].map((el) => `.${el.className}`).join(", ")}]`);
+    // Tab order inside the dots line: the dots, then −, then +.
+    const tabOrder = [...m.dotsLine.querySelectorAll("button")].filter((el) => el.tabIndex >= 0);
+    const tabNames = tabOrder.map((el) => (el.classList.contains("gpb-stop") ? "dot" : el === m.minusButton ? "−" : el === m.plusButton ? "+" : el.className));
+    check(49, "−|+ stepper: a group 'Colours' outside .gpb-stops, right after it; − then +, labelled; not draggable; tab order dots, −, +",
+      m.stepper?.getAttribute("role") === "group" && m.stepper.getAttribute("aria-label") === "Colours" &&
+        !m.stopsRow.contains(m.stepper) && m.stopsRow.nextElementSibling === m.stepper && !m.root.querySelector(".gpb-stepper ~ .gpb-plus, .gpb-dots > .gpb-plus") &&
+        [...m.stepper.querySelectorAll("button")].every((b, i) => b === [m.minusButton, m.plusButton][i] && !b.draggable) &&
+        m.minusButton.getAttribute("aria-label") === REMOVE_LABEL && m.minusButton.title === REMOVE_LABEL && !m.minusButton.disabled &&
+        m.plusButton.getAttribute("aria-label") === ADD_LABEL && m.plusButton.title === ADD_LABEL && !m.plusButton.disabled &&
+        tabNames.join() === [...dots().map(() => "dot"), "−", "+"].join(),
+      `after .${m.stepper?.previousElementSibling?.className}, role ${m.stepper?.getAttribute("role")}, ` +
+        `− "${m.minusButton.title}" disabled ${m.minusButton.disabled}, + "${m.plusButton.title}" disabled ${m.plusButton.disabled}, tab order ${tabNames.join(", ")}`);
     const icons = m.stopsRow.querySelectorAll("svg, .gpb-action, .gpb-badge, .gpb-grip");
     check(31, "No icons on the colour dots", !icons.length, `${icons.length} found`);
     const editorRow = m.root.querySelectorAll('.gpb-editor, input[type="color"]');
@@ -1812,17 +1863,26 @@
     const resetOff = centreX(resetRect) - centreX(rowRect);
     check(47, "Reset alone in the action row, centred (±1 px)", m.actions.children.length === 1 && Math.abs(resetOff) <= 1,
       `Reset's centre ${resetOff.toFixed(1)} px from the row's, row ${Math.round(rowRect.width)} px`);
-    // ── + after the dots (#47) ──
+    // ── −|+ stepper after the dots (#49) ──
     const lastDot = dots()[dots().length - 1];
     const dotRect = lastDot.getBoundingClientRect();
-    const plusRect = m.plusButton.getBoundingClientRect();
-    const plusGap = plusRect.left - dotRect.right;
-    const plusCentreDiff = Math.abs(centreY(plusRect) - centreY(dotRect));
-    check(47, `+ sits right after the last dot on the same line (centres within 2 px, ${STOP_GAP} px apart like the dots), dot-sized`,
-      plusCentreDiff <= 2 && Math.abs(plusGap - STOP_GAP) <= 1 &&
-        Math.abs(plusRect.width - dotRect.width) <= 0.5 && Math.abs(plusRect.height - dotRect.height) <= 0.5,
-      `centres differ ${plusCentreDiff.toFixed(1)} px, gap ${plusGap.toFixed(1)} px, ` +
-        `+ ${plusRect.width.toFixed(1)}×${plusRect.height.toFixed(1)}, dot ${dotRect.width.toFixed(1)}×${dotRect.height.toFixed(1)}`);
+    const stepperRect = m.stepper.getBoundingClientRect();
+    const stepperGap = stepperRect.left - dotRect.right;
+    const stepperCentreDiff = Math.abs(centreY(stepperRect) - centreY(dotRect));
+    check(49, `Stepper sits right after the last dot on the same line (centres within 2 px, ${STOP_GAP} px apart like the dots), a dot's height (±1 px)`,
+      stepperCentreDiff <= 2 && Math.abs(stepperGap - STOP_GAP) <= 1 && Math.abs(stepperRect.height - dotRect.height) <= 1,
+      `centres differ ${stepperCentreDiff.toFixed(1)} px, gap ${stepperGap.toFixed(1)} px, ` +
+        `stepper ${stepperRect.width.toFixed(1)}×${stepperRect.height.toFixed(1)}, dot ${dotRect.width.toFixed(1)}×${dotRect.height.toFixed(1)}`);
+    const halves = { "−": m.minusButton, "+": m.plusButton };
+    const halfSizes = Object.entries(halves).map(([name, el]) => {
+      const r = el.getBoundingClientRect();
+      return `${name} ${r.width.toFixed(1)}×${r.height.toFixed(1)}`;
+    });
+    const missedHalves = Object.entries(halves).filter(([, el]) => !reachable(el, false)).map(([name]) => name);
+    const halfWidths = Object.values(halves).map((el) => el.getBoundingClientRect().width);
+    check(49, "Both stepper halves are about 34 px wide and hit-test to themselves",
+      !missedHalves.length && halfWidths.every((w) => Math.abs(w - 34) <= 2),
+      `${halfSizes.join(", ")}${missedHalves.length ? `; not hit: ${missedHalves.join(", ")}` : ""}`);
     check(37, "Action row → help text gap is ≥ 16 px", helpGap >= 16, `${helpGap.toFixed(1)} px`);
     // ── Bottom margin (#48): help text → the dialog's bottom edge ≈ our root → its left edge ──
     // Scrolled to the end; every ancestor's share of the bottom gap goes into the detail.
@@ -1915,19 +1975,49 @@
     check(4, "New stop = a copy of the last stop (theme stays theme, #46)",
       added.id !== lastBeforeAdd.id && added.kind === lastBeforeAdd.kind && added.color === lastBeforeAdd.color,
       `${JSON.stringify(added)} after ${JSON.stringify(lastBeforeAdd)}`);
-    rightClick(plusNode);
-    const plusMenu = menuShown();
+    const stepperMenus = [m.minusButton, plusNode].map((el) => (rightClick(el), menuShown()));
     closePopover();
-    check(47, "The + isn't a dot: same node after adding, no dot menu on right-click",
-      m.plusButton === plusNode && plusNode.isConnected && !plusMenu && !dots().includes(plusNode),
-      `connected ${plusNode.isConnected}, menu ${plusMenu}`);
-    for (let i = 0; i < MAX_STOPS + 2; i++) click(m.plusButton);
+    check(49, "The stepper isn't a dot: same nodes after adding, no dot menu on right-click",
+      m.plusButton === plusNode && plusNode.isConnected && m.minusButton.isConnected && !stepperMenus.some(Boolean) &&
+        !dots().includes(plusNode) && !dots().includes(m.minusButton),
+      `connected ${plusNode.isConnected}/${m.minusButton.isConnected}, menu ${stepperMenus.join("/")}`);
+    plusNode.focus();
+    for (let i = 0; i < MAX_STOPS + 2 && !m.plusButton.disabled; i++) click(m.plusButton);
+    await sleep(20);
+    stillOpen("+ up to eight colours");
     check(4, "Add stops at 8, + disabled with the title 'Up to 8 colours'",
       settings.stops.length === MAX_STOPS && m.plusButton.disabled && m.plusButton.title === ADD_FULL_LABEL,
       `${settings.stops.length} stops, disabled ${m.plusButton.disabled}, title "${m.plusButton.title}"`);
+    check(49, "+ disabled while focused → focus moves to the selected dot",
+      document.activeElement === dotEl(selectedId), `focus ${document.activeElement?.dataset?.id ?? document.activeElement?.className}, selected ${selectedId}`);
     rightClick(dots()[0]);
     check(33, "Eight stops → Duplicate disabled", m.duplicateItem.disabled, `disabled ${m.duplicateItem.disabled}`);
     closePopover();
+
+    // ── − removes the selected dot (#49): the dot menu's Remove, so the #35 rule applies ──
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    selectStop("s2");
+    const minusNode = m.minusButton;
+    const minusState = () =>
+      `stops ${settings.stops.map((s) => s.id).join()}, gradient ${settings.gradient}, ${selection()}, ` +
+      `− disabled ${minusNode.disabled} "${minusNode.title}", focus ${document.activeElement?.dataset?.id ?? document.activeElement?.className}`;
+    minusNode.focus();
+    click(minusNode);
+    await sleep(20);
+    const minusOpen = m.root.isConnected && modal === m;
+    check(49, "− removes the selected dot; the one now in its place is selected; focus stays on −; modal open",
+      minusOpen && settings.stops.map((s) => s.id).join() === "s1,s3" && selectionIs("s3") &&
+        m.minusButton === minusNode && minusNode.isConnected && document.activeElement === minusNode,
+      minusState());
+    stillOpen("−");
+    click(minusNode);
+    await sleep(20);
+    const lastOpen = m.root.isConnected && modal === m;
+    check(49, "− down to one colour → gradient off, − disabled ('At least one colour'), focus moves to the selected dot",
+      lastOpen && settings.stops.length === 1 && !settings.gradient && minusNode.disabled && minusNode.title === REMOVE_LAST_LABEL &&
+        selectionIs(settings.stops[0].id) && document.activeElement === dotEl(selectedId),
+      minusState());
+    stillOpen("− down to one colour");
 
     // ── Selection (#35) ──
     const removeVia = async (el, after) => {
@@ -2173,6 +2263,40 @@
     check(24, "Alt+arrow keys on a dot don't navigate Spotify (Back/Forward)", navState() === navBefore,
       `before ${navBefore}, after ${navState()}`);
 
+    // ── Delete / Backspace on a focused dot (#49): real keydown events on the dot nodes ──
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)]);
+    selectStop("s1");
+    dotEl("s2").focus();
+    const deleteKept = press(dotEl("s2"), "Delete");
+    await sleep(20);
+    const deleteOpen = m.root.isConnected && modal === m;
+    check(49, "Delete on a focused, unselected dot removes that dot and keeps the selection; focus on the dot now at its index; announced",
+      deleteOpen && !deleteKept && stopOrder() === "s1,s3" && selectionIs("s1") && focusedOn("s3") &&
+        m.announce.textContent === "Colour removed, 2 left",
+      `${kbState()}, default prevented ${!deleteKept}`);
+    stillOpen("Delete on a dot");
+    selectStop("s3");
+    dotEl("s3").focus();
+    const backspaceKept = press(dotEl("s3"), "Backspace");
+    await sleep(20);
+    const backspaceOpen = m.root.isConnected && modal === m;
+    check(49, "Backspace on the selected (last) dot removes it; the selection moves as with Remove; focus on the dot now at that index (clamped)",
+      backspaceOpen && !backspaceKept && stopOrder() === "s1" && selectionIs("s1") && focusedOn("s1") && !settings.gradient &&
+        m.announce.textContent === "Colour removed, 1 left",
+      `${kbState()}, gradient ${settings.gradient}, default prevented ${!backspaceKept}`);
+    stillOpen("Backspace on a dot");
+    const lastKept = press(dotEl("s1"), "Delete");
+    check(49, "Delete with one colour removes nothing, but the key is consumed", stopOrder() === "s1" && !lastKept,
+      `${kbState()}, default prevented ${!lastKept}`);
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)]);
+    selectStop("s2");
+    m.hex.focus();
+    const hexKept = press(m.hex, "Backspace");
+    check(49, "Backspace in the hex field removes no dot (and isn't consumed)", stopOrder() === "s1,s2" && hexKept,
+      `${kbState()}, default prevented ${!hexKept}`);
+    await sleep(50);
+    check(49, "Delete and Backspace on a dot don't navigate Spotify", navState() === navBefore, `before ${navBefore}, after ${navState()}`);
+
     // ── Two-step Reset (#37): real pointer/mouse sequences and keys on the same button node ──
     const realClick = (el) => {
       const r = el.getBoundingClientRect();
@@ -2309,16 +2433,16 @@
     const disabledWithOne = spreadShows("anchored", false) && settings.stops.length === 1;
     realClick(m.plusButton);
     step("+", true);
-    rightClick(dots()[1]);
-    m.removeItem.click();
+    realClick(m.minusButton);
     await sleep(20);
+    step("− to one colour", false);
     rightClick(dots()[0]);
     m.duplicateItem.click();
     await sleep(20);
     step("Duplicate", true);
     check(15, "Row disabled with one colour: buttons disabled, hint 'Applies when the gradient is on.'", disabledWithOne,
       gradientSteps[2]);
-    check(15, "The Gradient switch, Remove, the + button and Duplicate disable/enable the row in place (mode kept)",
+    check(15, "The Gradient switch, Remove, the stepper's + and − and Duplicate disable/enable the row in place (mode kept)",
       gradientSteps.every((s) => s.endsWith(": ok")), gradientSteps.join("; "));
     stillOpen("gradient changes with the Spread row");
 

@@ -42,7 +42,11 @@ It covers:
   - the dot and picker in the open settings follow too.
 - Gradient switch with one colour (#46): enabled and off, no row tooltip; switching it on adds a copy of the colour (a theme colour stays theme), turns the gradient on, selects the new dot, keeps focus on the same switch node, enables the Spread row and leaves the settings open; switching off keeps both colours; switching on with two adds nothing.
 - Switch, add, the 8-stop limit, dimmed unused stops, preview, drag reorder.
-- Layout (#47): no *+ Add colour* button left; the + sits outside the dots container, right after the last dot (same line, 14 px like the dots, dot-sized), isn't a dot (no menu, not draggable, same node after adding), adds and selects a copy of the last colour, and is disabled at 8 with *Up to 8 colours*; *Reset* alone in its row, centred (±1 px); help text last, with both lines.
+- Layout (#47): no *+ Add colour* button left; *Reset* alone in its row, centred (±1 px); help text last, with both lines.
+- −|+ stepper (#49):
+  - a group *Colours* outside the dots container, right after the last dot (same line, 14 px like the dots, a dot's height); − then +, tab order dots, −, +; both halves about 34 px wide and hit-test to themselves; not a dot (no menu, not draggable, same nodes after adding);
+  - + adds and selects a copy of the last colour and is disabled at 8 (*Up to 8 colours*); − removes the selected dot with the #35 selection rule, keeps focus, and is disabled at one colour (*At least one colour*), which turns the gradient off; a focused half that becomes disabled hands focus to the selected dot; the settings stay open.
+- Delete/Backspace on a focused dot (#49): removes that dot (an unselected one keeps the selection, the selected one moves it as Remove does); focus on the dot now at that index; *Colour removed, N left* announced; at one colour nothing is removed but the key is consumed; Backspace in the hex field removes nothing; Spotify doesn't navigate.
 - Two-step Reset with real clicks:
   - the first click only arms it (*Confirm reset?*, same width), the second resets;
   - waiting 3 s, Escape, clicking a dot, or closing the settings disarms it without resetting.
