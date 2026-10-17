@@ -45,6 +45,7 @@ It covers:
 - Layout (#47): no *+ Add colour* button left; *Reset* alone in its row, centred (±1 px); help text last, with both lines.
 - −|+ stepper (#49):
   - a group *Colours* outside the dots container, right after the last dot (same line, 14 px like the dots, a dot's height); − then +, tab order dots, −, +; both halves about 34 px wide and hit-test to themselves; not a dot (no menu, not draggable, same nodes after adding);
+  - at rest the middle is one line (+'s left border transparent, −'s right border the normal colour), each half 34 px between its borders, the pill 71 × 32 px; the hover rule (#50) sets the hovered half's whole outline and glyph to `--spice-text`, excludes disabled halves, and raises + over −'s edge (read through CSSOM);
   - + adds and selects a copy of the last colour and is disabled at 8 (*Up to 8 colours*); − removes the selected dot with the #35 selection rule, keeps focus, and is disabled at one colour (*At least one colour*), which turns the gradient off; a focused half that becomes disabled hands focus to the selected dot; the settings stay open.
 - Delete/Backspace on a focused dot (#49): removes that dot (an unselected one keeps the selection, the selected one moves it as Remove does); focus on the dot now at that index; *Colour removed, N left* announced; at one colour nothing is removed but the key is consumed; Backspace in the hex field removes nothing; Spotify doesn't navigate.
 - Two-step Reset with real clicks:
@@ -89,6 +90,7 @@ What needs a human (≤ 8 items):
    - Right-click a dot → Duplicate / Remove.
    - Drag a dot → a marker shows where it lands and the order changes.
    - Tab to a dot, press Alt+→ → it moves and keeps focus; Spotify doesn't go back or forward.
+   - Hover − and + → the hovered half's outline, including the middle line, and its glyph brighten, like Reset.
 3. playback-bar-waveform on → gradient inside the waveform, playhead line in the last colour, also in *Anchored* (colours fixed in place inside the waveform); off → plain bar correct.
 4. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* Hazy with *Custom color* on → change it and Apply → the bar and the selected Spread button's fill follow, its label stays easy to read; off → the bar follows the album-art colour across songs.
 5. *Blocked until Spicetify's Topbar works, see [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38).* After using these settings, open Hazy Settings → its colour picker and Apply still work; this modal looks right under Hazy.

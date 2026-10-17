@@ -353,6 +353,10 @@
   // --spice-rgb-button: Hazy rewrites --spice-button at runtime but leaves --spice-rgb-button
   // at the colour scheme's value (#40); tints use color-mix() on var(--spice-button) instead.
   // The label switches to --spice-main (gpb-on-light) when that contrasts more (#43).
+  // The −|+ stepper is two "D"s (#50): − has the whole outline, its right edge is the middle
+  // line; + overlaps it by 1 px with a transparent left border, so at rest the middle is one
+  // line, not two translucent ones on top of each other. A hovered half lights up its whole
+  // outline, middle line included (+ is raised over −'s edge), like Reset's border.
   const MODAL_CSS = `
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; padding-top: 20px; color: var(--spice-text); }
 .gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
@@ -380,13 +384,15 @@
 .gpb-stop.gpb-unused { opacity: .5; }
 .gpb-stop.gpb-dragging { opacity: .3; }
 .gpb-announce { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.gpb-stepper { flex: none; display: flex; box-sizing: border-box; height: 32px; margin: 4px 0; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 16px; overflow: hidden; }
-.gpb-step { display: flex; align-items: center; justify-content: center; width: 34px; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; color: var(--spice-subtext); cursor: pointer; }
-.gpb-step:hover:not(:disabled) { color: var(--spice-text); }
+.gpb-stepper { flex: none; display: flex; height: 32px; margin: 4px 0; }
+.gpb-step { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 36px; height: 100%; margin: 0; padding: 0; border: 1px solid rgba(var(--spice-rgb-text), .3); background: none; color: var(--spice-subtext); cursor: pointer; }
+.gpb-minus { border-radius: 16px 0 0 16px; }
+.gpb-plus { margin-left: -1px; border-left-color: transparent; border-radius: 0 16px 16px 0; }
+.gpb-step:hover:not(:disabled) { border-color: var(--spice-text); color: var(--spice-text); }
+.gpb-plus:hover:not(:disabled) { position: relative; z-index: 1; }
 .gpb-step:disabled { cursor: not-allowed; }
 .gpb-step:disabled > svg { opacity: .5; }
 .gpb-step:focus-visible { outline: 2px solid var(--spice-text); outline-offset: -3px; }
-.gpb-step-divider { flex: none; width: 1px; background-color: rgba(var(--spice-rgb-text), .3); }
 .gpb-marker { position: absolute; width: 2px; height: 32px; border-radius: 1px; background-color: var(--spice-button); pointer-events: none; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
@@ -491,7 +497,6 @@
         <div class="gpb-stops"></div>
         <div class="gpb-stepper" role="group" aria-label="Colours">
           <button type="button" class="gpb-step gpb-minus" aria-label="${REMOVE_LABEL}" title="${REMOVE_LABEL}">${MINUS_ICON}</button>
-          <span class="gpb-step-divider" aria-hidden="true"></span>
           <button type="button" class="gpb-step gpb-plus" aria-label="${ADD_LABEL}" title="${ADD_LABEL}">${PLUS_ICON}</button>
         </div>
       </div>
@@ -1879,10 +1884,28 @@
       return `${name} ${r.width.toFixed(1)}×${r.height.toFixed(1)}`;
     });
     const missedHalves = Object.entries(halves).filter(([, el]) => !reachable(el, false)).map(([name]) => name);
-    const halfWidths = Object.values(halves).map((el) => el.getBoundingClientRect().width);
-    check(49, "Both stepper halves are about 34 px wide and hit-test to themselves",
-      !missedHalves.length && halfWidths.every((w) => Math.abs(w - 34) <= 2),
-      `${halfSizes.join(", ")}${missedHalves.length ? `; not hit: ${missedHalves.join(", ")}` : ""}`);
+    const inner = Object.values(halves).map((el) => el.clientWidth); // between the borders
+    check(49, "Both stepper halves are 34 px wide between their borders (pill 71 × 32 px) and hit-test to themselves",
+      !missedHalves.length && inner.every((w) => Math.abs(w - 34) <= 1) && Math.abs(stepperRect.width - 71) <= 1,
+      `${halfSizes.join(", ")}, inside the borders ${inner.join(" and ")} px, pill ${stepperRect.width.toFixed(1)} px` +
+        `${missedHalves.length ? `; not hit: ${missedHalves.join(", ")}` : ""}`);
+    // Real :hover can't be triggered from script, so the hover rules are read from our stylesheet (#50).
+    const modalRules = [...(m.root.querySelector("style")?.sheet?.cssRules ?? [])].filter((r) => r.selectorText);
+    const hoverRule = modalRules.find((r) => /\.gpb-step:hover:not\(:disabled\)/.test(r.selectorText) &&
+      r.style.getPropertyValue("border-color").trim() === "var(--spice-text)" && r.style.getPropertyValue("color").trim() === "var(--spice-text)");
+    const raiseRule = modalRules.find((r) => /\.gpb-plus:hover:not\(:disabled\)/.test(r.selectorText) &&
+      r.style.getPropertyValue("z-index").trim() === "1" && r.style.getPropertyValue("position").trim() === "relative");
+    check(50, "Hover on an enabled half: its whole outline and its glyph → --spice-text; + is raised over −'s edge",
+      !!hoverRule && !!raiseRule,
+      `${hoverRule ? `"${hoverRule.cssText}"` : "no .gpb-step:hover:not(:disabled) rule with border-color and color var(--spice-text)"}; ` +
+        `${raiseRule ? `"${raiseRule.cssText}"` : "no .gpb-plus:hover:not(:disabled) rule with position: relative; z-index: 1"}`);
+    const minusStyle = getComputedStyle(m.minusButton);
+    const plusLeft = parseRgb(getComputedStyle(m.plusButton).borderLeftColor);
+    const middle = parseRgb(minusStyle.borderRightColor);
+    check(50, "At rest the middle is one line: +'s left border is transparent, −'s right border has the normal colour",
+      !!plusLeft && plusLeft[3] === 0 && !!middle && middle[3] > 0 && minusStyle.borderRightColor === minusStyle.borderTopColor &&
+        !m.stepper.querySelector(".gpb-step-divider"),
+      `+ left ${getComputedStyle(m.plusButton).borderLeftColor}, − right ${minusStyle.borderRightColor}, − top ${minusStyle.borderTopColor}`);
     check(37, "Action row → help text gap is ≥ 16 px", helpGap >= 16, `${helpGap.toFixed(1)} px`);
     // ── Bottom margin (#48): help text → the dialog's bottom edge ≈ our root → its left edge ──
     // Scrolled to the end; every ancestor's share of the bottom gap goes into the detail.

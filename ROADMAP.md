@@ -6,7 +6,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 
 | # | Issue | Area | Status |
 |---|---|---|---|
-| [#50](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/50) | Stepper: hover feedback per half (outline incl. middle line, glyph) | ui, bug | ⏳ |
+| [#50](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/50) | Stepper: hover feedback per half (outline incl. middle line, glyph) | ui, bug | ✅ |
 
 ## v1.4.0 — released 2026-10-17
 
