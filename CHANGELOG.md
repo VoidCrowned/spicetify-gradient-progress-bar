@@ -2,6 +2,13 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.4.0] — 2026-10-17
+
+### Changed
+- **− | + after the colour dots** ([#49](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/49)). The round + is now a small pill with two halves: **+** adds a colour as before, and the new **−** removes the selected colour (the one with the ring). Until now removing a colour was only in the right-click menu, which was easy to miss. The right-click menu stays.
+- **Delete or Backspace removes a colour** ([#49](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/49)): tab to a colour dot and press either key. Typing in the hex or R/G/B fields isn't affected.
+- The help text now mentions + and −.
+
 ## [1.3.0] — 2026-10-17
 
 ### Changed
