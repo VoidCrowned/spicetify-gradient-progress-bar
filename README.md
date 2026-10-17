@@ -38,10 +38,10 @@ To uninstall: `spicetify config extensions gradientProgressBar.js-` then `spicet
 - **Use theme colour** in the picker makes the selected colour follow your theme's accent; the button then reads *Following theme colour*. Hover a dot to see whether it's a theme colour.
 - **Right-click a dot** for **Duplicate** and **Remove** (also with the context-menu key or Shift+F10).
 - **Gradient** switches the gradient on and off. With only one colour, switching it on adds a second colour (a copy of the first) for you to change.
-- **+ Add colour** adds another and selects it; with two or more, gradient mode switches on.
+- **+** (the round button after the dots) adds another colour, a copy of the last one, and selects it; with two or more, gradient mode switches on. Up to 8 colours.
 - **Spread** (below the Gradient switch) picks how the gradient covers the bar: *Compress*, *Anchored* or *Slide*. The line below the buttons describes the active one.
 - **Drag the dots** to reorder the gradient. With the keyboard, Alt + arrow keys move the focused colour (Alt + Home / End to the first or last place).
-- **Reset** returns to the default (your theme's own colour, no gradient). It asks for a second click to confirm: the button turns red and reads *Confirm reset?* for 3 seconds; waiting, pressing Escape or clicking anything else cancels.
+- **Reset** (centred below the picker) goes back to the default: a single colour that follows your theme, no gradient. It asks for a second click to confirm: the button turns red and reads *Confirm reset?* for 3 seconds; waiting, pressing Escape or clicking anything else cancels.
 
 ## Compatibility
 

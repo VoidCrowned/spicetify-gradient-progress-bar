@@ -371,18 +371,23 @@
 .gpb-mode:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-spread-hint { margin: 0; font-size: .75rem; line-height: 1.4; color: var(--spice-subtext); }
 .gpb-preview { height: 8px; border-radius: 4px; }
+.gpb-dots { display: flex; align-items: flex-end; gap: 10px; }
 .gpb-stops { position: relative; display: flex; flex-wrap: wrap; gap: 14px; padding: 4px; }
 .gpb-stop { position: relative; width: 32px; height: 32px; padding: 0; border: 2px solid rgba(var(--spice-rgb-text), .25); border-radius: 50%; cursor: pointer; }
 .gpb-stop.gpb-selected, .gpb-stop:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 3px; }
 .gpb-stop.gpb-unused { opacity: .5; }
 .gpb-stop.gpb-dragging { opacity: .3; }
 .gpb-announce { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.gpb-plus { flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 32px; height: 32px; margin: 4px 0; padding: 0; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 50%; background: none; color: var(--spice-subtext); cursor: pointer; }
+.gpb-plus:hover:not(:disabled) { color: var(--spice-text); }
+.gpb-plus:disabled { opacity: .5; cursor: not-allowed; }
+.gpb-plus:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 3px; }
 .gpb-marker { position: absolute; width: 2px; height: 32px; border-radius: 1px; background-color: var(--spice-button); pointer-events: none; }
 .gpb-button { align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-weight: 700; cursor: pointer; }
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
-.gpb-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.gpb-actions { display: flex; justify-content: center; align-items: center; }
 .gpb-actions > .gpb-button { align-self: center; }
 .gpb-reset { display: inline-grid; justify-items: center; }
 .gpb-reset > span { grid-area: 1 / 1; }
@@ -431,6 +436,11 @@
   const REORDER_HINT = "Drag or Alt+←/→ to reorder"; // second line of the dot tooltip (#24)
   const HELP_TEXT =
     "Click a colour to edit it below, right-click it to duplicate or remove it. Drag colours to reorder them.";
+  const HELP_RESET = "Reset goes back to a single colour that follows your theme."; // the help's second line (#47)
+  const ADD_LABEL = "Add colour";
+  const ADD_FULL_LABEL = `Up to ${MAX_STOPS} colours`;
+  const PLUS_ICON =
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 2h1.5v5.25H14v1.5H8.75V14h-1.5V8.75H2v-1.5h5.25z"/></svg>';
 
   const EYEDROPPER_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.35 2.65a2 2 0 0 0-2.83 0L8.9 4.27l-.7-.71-1.06 1.06.7.71-5.3 5.3a1.5 1.5 0 0 0-.44 1.07L2 14l2.3-.1a1.5 1.5 0 0 0 1.07-.44l5.3-5.3.71.7 1.06-1.06-.7-.71 1.61-1.61a2 2 0 0 0 0-2.83zM4.3 12.4l-.8.04.04-.8 5.37-5.37.76.76z"/></svg>';
@@ -468,7 +478,10 @@
         <p class="gpb-spread-hint" id="gpb-spread-hint"></p>
       </div>
       <div class="gpb-preview"></div>
-      <div class="gpb-stops"></div>
+      <div class="gpb-dots">
+        <div class="gpb-stops"></div>
+        <button type="button" class="gpb-plus" aria-label="${ADD_LABEL}" title="${ADD_LABEL}">${PLUS_ICON}</button>
+      </div>
       <div class="gpb-colour-picker" role="group" aria-label="Selected colour">
         <div class="gpb-sv" role="slider" tabindex="0" aria-label="Saturation and brightness"><div class="gpb-sv-handle"></div></div>
         <div class="gpb-controls">
@@ -487,10 +500,9 @@
         </div>
       </div>
       <div class="gpb-actions">
-        <button type="button" class="gpb-button gpb-add">+ Add colour</button>
         <button type="button" class="gpb-button gpb-reset"><span class="gpb-reset-label" aria-live="polite">Reset</span><span class="gpb-reset-sizer" aria-hidden="true">${RESET_CONFIRM_LABEL}</span></button>
       </div>
-      <p class="gpb-help">${HELP_TEXT}</p>`;
+      <p class="gpb-help">${HELP_TEXT}<br>${HELP_RESET}</p>`;
 
     const m = {
       root,
@@ -501,9 +513,10 @@
       modeButtons: [...root.querySelectorAll(".gpb-mode")],
       spreadHint: root.querySelector(".gpb-spread-hint"),
       preview: root.querySelector(".gpb-preview"),
+      dotsLine: root.querySelector(".gpb-dots"),
       stopsRow: root.querySelector(".gpb-stops"),
+      plusButton: root.querySelector(".gpb-plus"),
       actions: root.querySelector(".gpb-actions"),
-      addButton: root.querySelector(".gpb-add"),
       resetButton: root.querySelector(".gpb-reset"),
       resetLabel: root.querySelector(".gpb-reset-label"),
       help: root.querySelector(".gpb-help"),
@@ -526,7 +539,12 @@
 
     m.switchButton.addEventListener("click", toggleGradient);
     enableSpread(m);
-    m.addButton.addEventListener("click", addStop);
+    // Outside .gpb-stops, which renderStops() empties: the clicked + is never detached (#26, #47).
+    m.plusButton.addEventListener("click", () => {
+      const hadFocus = document.activeElement === m.plusButton;
+      addStop();
+      if (hadFocus && m.plusButton.disabled) dotEl(selectedId)?.focus({ preventScroll: true }); // at 8 it's disabled
+    });
     m.stopsRow.addEventListener("click", (e) => {
       const el = e.target.closest(".gpb-stop");
       if (!el || performance.now() - lastDragEnd < 300) return; // a drag never changes the selection
@@ -623,7 +641,7 @@
   }
 
   // ── Two-step Reset (#37) ──
-  // Reset can't be undone and sits next to + Add colour, so the first click only arms it
+  // Reset can't be undone, so the first click only arms it
   // ("Confirm reset?" in red); a second click within RESET_CONFIRM_MS resets. Only the label
   // and a class change — the button node is never replaced, so its click target stays
   // connected (#26). A hidden copy of the longer label keeps the button's width fixed.
@@ -1010,7 +1028,7 @@
     });
   }
 
-  const STOP_GAP = 14; // matches .gpb-stops gap
+  const STOP_GAP = 14; // matches .gpb-stops gap; .gpb-dots' 10 px gap + its 4 px padding put the + as far away (#47)
 
   // The dots are buttons, so dragging never fights a native colour input (#8, #31).
   function enableDragAndDrop(m) {
@@ -1152,7 +1170,9 @@
     renderPreview();
     renderStops();
     showInPicker(findStop(selectedId));
-    modal.addButton.disabled = settings.stops.length >= MAX_STOPS;
+    const full = settings.stops.length >= MAX_STOPS;
+    modal.plusButton.disabled = full;
+    modal.plusButton.title = full ? ADD_FULL_LABEL : ADD_LABEL;
   }
 
   // In place, never replaced: focus stays on the switch when it adds a colour (#26, #46).
@@ -1713,16 +1733,22 @@
     check(3, "No id=color-input of ours (Hazy looks it up)", !colorInput || !m.root.contains(colorInput),
       colorInput ? "exists, but it's not ours" : "none in the document");
     const help = m.help;
-    check(37, "Help text is the last element of the modal content, after the action row",
-      help.textContent === HELP_TEXT && m.root.lastElementChild === help &&
+    check(37, "Help text is the last element of the modal content, after the action row, with both lines (#47)",
+      help.textContent === HELP_TEXT + HELP_RESET && help.querySelectorAll("br").length === 1 && m.root.lastElementChild === help &&
         m.actions.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING && !m.root.querySelector(".gpb-footer"),
-      `last child .${m.root.lastElementChild?.className}, text "${help.textContent}"`);
+      `last child .${m.root.lastElementChild?.className}, text "${help.innerText ?? help.textContent}"`);
+    check(47, "+ button replaces + Add colour: no .gpb-add left; outside .gpb-stops, right after it; not draggable",
+      !m.root.querySelector(".gpb-add") && m.actions.children.length === 1 && m.actions.firstElementChild === m.resetButton &&
+        !m.stopsRow.contains(m.plusButton) && m.stopsRow.nextElementSibling === m.plusButton && !m.plusButton.draggable &&
+        m.plusButton.getAttribute("aria-label") === ADD_LABEL && m.plusButton.title === ADD_LABEL && !m.plusButton.disabled,
+      `.gpb-add ${!!m.root.querySelector(".gpb-add")}, action row [${[...m.actions.children].map((el) => `.${el.className}`).join(", ")}], ` +
+        `+ after .${m.plusButton.previousElementSibling?.className}, label "${m.plusButton.getAttribute("aria-label")}", title "${m.plusButton.title}"`);
     const icons = m.stopsRow.querySelectorAll("svg, .gpb-action, .gpb-badge, .gpb-grip");
     check(31, "No icons on the colour dots", !icons.length, `${icons.length} found`);
     const editorRow = m.root.querySelectorAll('.gpb-editor, input[type="color"]');
     check(32, "No editor row and no native colour input", !editorRow.length, `${editorRow.length} found`);
-    check(35, "Picker is an inline panel between the dots and + Add colour, not a popover",
-      m.picker.parentElement === m.root && m.picker.previousElementSibling === m.stopsRow &&
+    check(35, "Picker is an inline panel between the dots and the Reset row, not a popover",
+      m.picker.parentElement === m.root && m.picker.previousElementSibling === m.dotsLine &&
         m.picker.nextElementSibling === m.actions && !m.picker.hidden && getComputedStyle(m.picker).position === "static",
       `after .${m.picker.previousElementSibling?.className}, before .${m.picker.nextElementSibling?.className}, ` +
         `position ${getComputedStyle(m.picker).position}`);
@@ -1766,17 +1792,23 @@
 
     // ── Action row (#37) ──
     const rowRect = m.actions.getBoundingClientRect();
-    const addRect = m.addButton.getBoundingClientRect();
     const resetRect = m.resetButton.getBoundingClientRect();
+    const centreX = (r) => r.left + r.width / 2;
     const centreY = (r) => r.top + r.height / 2;
-    const leftOff = addRect.left - rowRect.left;
-    const rightOff = rowRect.right - resetRect.right;
-    const centreDiff = Math.abs(centreY(addRect) - centreY(resetRect));
-    check(37, "+ Add colour and Reset share one row: Add at its left edge, Reset at its right",
-      m.addButton.parentElement === m.actions && m.resetButton.parentElement === m.actions &&
-        centreDiff <= 2 && Math.abs(leftOff) <= 2 && Math.abs(rightOff) <= 2,
-      `centres differ ${centreDiff.toFixed(1)} px, Add ${leftOff.toFixed(1)} px from the left, ` +
-        `Reset ${rightOff.toFixed(1)} px from the right, row ${Math.round(rowRect.width)} px`);
+    const resetOff = centreX(resetRect) - centreX(rowRect);
+    check(47, "Reset alone in the action row, centred (±1 px)", m.actions.children.length === 1 && Math.abs(resetOff) <= 1,
+      `Reset's centre ${resetOff.toFixed(1)} px from the row's, row ${Math.round(rowRect.width)} px`);
+    // ── + after the dots (#47) ──
+    const lastDot = dots()[dots().length - 1];
+    const dotRect = lastDot.getBoundingClientRect();
+    const plusRect = m.plusButton.getBoundingClientRect();
+    const plusGap = plusRect.left - dotRect.right;
+    const plusCentreDiff = Math.abs(centreY(plusRect) - centreY(dotRect));
+    check(47, `+ sits right after the last dot on the same line (centres within 2 px, ${STOP_GAP} px apart like the dots), dot-sized`,
+      plusCentreDiff <= 2 && Math.abs(plusGap - STOP_GAP) <= 1 &&
+        Math.abs(plusRect.width - dotRect.width) <= 0.5 && Math.abs(plusRect.height - dotRect.height) <= 0.5,
+      `centres differ ${plusCentreDiff.toFixed(1)} px, gap ${plusGap.toFixed(1)} px, ` +
+        `+ ${plusRect.width.toFixed(1)}×${plusRect.height.toFixed(1)}, dot ${dotRect.width.toFixed(1)}×${dotRect.height.toFixed(1)}`);
     check(37, "Action row → help text gap is ≥ 16 px", helpGap >= 16, `${helpGap.toFixed(1)} px`);
     // The content's bottom inside Spicetify's container (scroll-aware, its own padding excluded):
     // anything more than a small gap below the help text is empty space of ours.
@@ -1848,16 +1880,25 @@
     stillOpen("clicking away from the dot menu");
 
     const lastBeforeAdd = { ...settings.stops[settings.stops.length - 1] };
-    m.addButton.click();
-    stillOpen("adding a colour");
+    const plusNode = m.plusButton;
+    click(plusNode);
+    await sleep(20);
+    stillOpen("the + button");
     const added = settings.stops[settings.stops.length - 1];
-    check(35, "+ Add colour selects the new dot", selectionIs(added.id), selection());
+    check(35, "+ selects the new dot", selectionIs(added.id), selection());
     check(4, "New stop = a copy of the last stop (theme stays theme, #46)",
       added.id !== lastBeforeAdd.id && added.kind === lastBeforeAdd.kind && added.color === lastBeforeAdd.color,
       `${JSON.stringify(added)} after ${JSON.stringify(lastBeforeAdd)}`);
-    for (let i = 0; i < MAX_STOPS + 2; i++) m.addButton.click();
-    check(4, "Add stops at 8, button disabled", settings.stops.length === MAX_STOPS && m.addButton.disabled,
-      `${settings.stops.length} stops, disabled ${m.addButton.disabled}`);
+    rightClick(plusNode);
+    const plusMenu = menuShown();
+    closePopover();
+    check(47, "The + isn't a dot: same node after adding, no dot menu on right-click",
+      m.plusButton === plusNode && plusNode.isConnected && !plusMenu && !dots().includes(plusNode),
+      `connected ${plusNode.isConnected}, menu ${plusMenu}`);
+    for (let i = 0; i < MAX_STOPS + 2; i++) click(m.plusButton);
+    check(4, "Add stops at 8, + disabled with the title 'Up to 8 colours'",
+      settings.stops.length === MAX_STOPS && m.plusButton.disabled && m.plusButton.title === ADD_FULL_LABEL,
+      `${settings.stops.length} stops, disabled ${m.plusButton.disabled}, title "${m.plusButton.title}"`);
     rightClick(dots()[0]);
     check(33, "Eight stops → Duplicate disabled", m.duplicateItem.disabled, `disabled ${m.duplicateItem.disabled}`);
     closePopover();
@@ -2240,8 +2281,8 @@
     await sleep(20);
     step("remove to one colour", false);
     const disabledWithOne = spreadShows("anchored", false) && settings.stops.length === 1;
-    realClick(m.addButton);
-    step("+ Add colour", true);
+    realClick(m.plusButton);
+    step("+", true);
     rightClick(dots()[1]);
     m.removeItem.click();
     await sleep(20);
@@ -2251,7 +2292,7 @@
     step("Duplicate", true);
     check(15, "Row disabled with one colour: buttons disabled, hint 'Applies when the gradient is on.'", disabledWithOne,
       gradientSteps[2]);
-    check(15, "The Gradient switch, Remove, + Add colour and Duplicate disable/enable the row in place (mode kept)",
+    check(15, "The Gradient switch, Remove, the + button and Duplicate disable/enable the row in place (mode kept)",
       gradientSteps.every((s) => s.endsWith(": ok")), gradientSteps.join("; "));
     stillOpen("gradient changes with the Spread row");
 
