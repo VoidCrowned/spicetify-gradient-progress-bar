@@ -2,6 +2,16 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.3.0] — 2026-10-17
+
+### Changed
+- **The Gradient switch works with one colour** ([#46](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/46)). It used to be greyed out until you added a second colour, and the only hint was a tooltip on the row. Now switching it on adds a second colour, a copy of the first, and selects it so you can change it straight away. Switching off keeps your colours as before.
+- **A round + after the colour dots** replaces the *+ Add colour* button ([#47](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/47)). It adds a copy of the last colour and selects it; at 8 colours it's greyed out. Adding a colour after a theme colour now gives another theme colour, the same as Duplicate.
+- **Reset is centred** below the colour picker, and the help text explains it: "Reset goes back to a single colour that follows your theme." ([#47](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/47))
+
+### Fixed
+- **Even margins in the settings window** ([#48](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/48)). Under Hazy there was more than twice as much empty space below the help text as at the sides, because the theme adds padding to the popup that Spicetify's settings windows share. The space now matches the sides. Only this extension's settings window changes; other extensions' popups are untouched.
+
 ## [1.2.5] — 2026-10-16
 
 ### Changed
