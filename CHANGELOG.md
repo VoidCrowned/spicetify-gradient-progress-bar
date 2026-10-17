@@ -2,6 +2,11 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.4.1] — 2026-10-17
+
+### Fixed
+- **Hover feedback on − and +** ([#50](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/50)). Hovering a half of the − | + pill only made its symbol slightly lighter, which was hard to see, especially under Hazy. Now the hovered half's whole outline, including the line in the middle, brightens together with its symbol, the same way Reset's border does. At rest the pill looks as before.
+
 ## [1.4.0] — 2026-10-17
 
 ### Changed
