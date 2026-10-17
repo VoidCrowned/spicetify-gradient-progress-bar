@@ -40,6 +40,7 @@ It covers:
   - emitted as a CSS variable;
   - follows runtime `--spice-button` changes;
   - the dot and picker in the open settings follow too.
+- Gradient switch with one colour (#46): enabled and off, no row tooltip; switching it on adds a copy of the colour (a theme colour stays theme), turns the gradient on, selects the new dot, keeps focus on the same switch node, enables the Spread row and leaves the settings open; switching off keeps both colours; switching on with two adds nothing.
 - Switch, add, the 8-stop limit, dimmed unused stops, preview, drag reorder.
 - Layout: *+ Add colour* and *Reset* in one row (left and right edges), help text last with no empty footer below it.
 - Two-step Reset with real clicks:

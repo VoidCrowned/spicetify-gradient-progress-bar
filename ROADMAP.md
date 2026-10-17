@@ -6,7 +6,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 
 | # | Issue | Area | Status |
 |---|---|---|---|
-| [#46](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/46) | Gradient switch with one colour adds a second colour | ui | ⏳ |
+| [#46](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/46) | Gradient switch with one colour adds a second colour | ui | ✅ |
 | [#47](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/47) | Small + after the colour dots replaces "+ Add colour"; Reset centred; help line | ui | ⏳ |
 | [#48](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/48) | Uneven margin below the help text | ui, bug | ⏳ |
 

@@ -258,14 +258,10 @@
     );
   }
 
+  // A copy of the last stop at the end, selected: Duplicate on the last stop. With one colour
+  // the Gradient switch does the same (#46).
   function addStop() {
-    if (settings.stops.length >= MAX_STOPS) return;
-    const last = settings.stops[settings.stops.length - 1];
-    const id = nextStopId();
-    settings.stops.push({ id, kind: "custom", color: resolveStop(last) });
-    if (settings.stops.length === 2) settings.gradient = true; // a second colour implies a gradient
-    selectedId = id;
-    update();
+    duplicateStop(settings.stops[settings.stops.length - 1].id);
   }
 
   // Inserts a copy directly after the stop (a theme stop stays a theme stop) and selects it.
@@ -275,7 +271,7 @@
     if (index === -1 || settings.stops.length >= MAX_STOPS) return id;
     const copy = { ...settings.stops[index], id: nextStopId() };
     settings.stops.splice(index + 1, 0, copy);
-    if (settings.stops.length === 2) settings.gradient = true; // same rule as adding
+    if (settings.stops.length === 2) settings.gradient = true; // a second colour implies a gradient
     selectedId = copy.id;
     update();
     return copy.id;
@@ -309,8 +305,10 @@
     if (modal) renderSpread();
   }
 
+  // With one colour there's nothing to switch on, so the switch adds a second one, exactly
+  // like adding a colour; that turns the gradient on (#46). The switch is never disabled.
   function toggleGradient() {
-    if (settings.stops.length < 2) return;
+    if (settings.stops.length < 2) return addStop();
     settings.gradient = !settings.gradient;
     update();
   }
@@ -361,7 +359,6 @@
 .gpb-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background-color: var(--spice-text); transition: transform .15s; }
 .gpb-switch[aria-checked="true"] { background-color: var(--spice-button); }
 .gpb-switch[aria-checked="true"]::after { transform: translateX(18px); }
-.gpb-switch:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-switch:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-spread { display: flex; flex-direction: column; gap: 8px; }
 .gpb-spread-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -1158,12 +1155,9 @@
     modal.addButton.disabled = settings.stops.length >= MAX_STOPS;
   }
 
+  // In place, never replaced: focus stays on the switch when it adds a colour (#26, #46).
   function renderSwitch() {
-    const single = settings.stops.length < 2;
     modal.switchButton.setAttribute("aria-checked", String(settings.gradient));
-    modal.switchButton.disabled = single;
-    // On the row, not the button: disabled buttons don't reliably show tooltips.
-    modal.gradientRow.title = single ? "Add a second colour to use a gradient" : "";
   }
 
   // The bar at 100 %, from the same gradient string as the stylesheet.
@@ -1677,17 +1671,35 @@
 
     check(35, "On open the first dot is selected and the picker shows its colour",
       selectionIs(settings.stops[0].id) && m.hex.value !== "", selection());
-    check(5, "One stop → switch disabled, gradient off", m.switchButton.disabled && !settings.gradient,
-      `disabled ${m.switchButton.disabled}, gradient ${settings.gradient}`);
-    m.addButton.click();
-    stillOpen("adding a stop");
-    check(35, "+ Add colour selects the new dot", selectionIs(settings.stops[1]?.id), selection());
-    check(5, "Adding a 2nd stop → gradient on, switch enabled",
-      settings.stops.length === 2 && settings.gradient && m.switchButton.getAttribute("aria-checked") === "true" && !m.switchButton.disabled,
-      `${settings.stops.length} stops, gradient ${settings.gradient}`);
-    check(4, "New stop = last stop's resolved colour",
-      settings.stops[1].kind === "custom" && settings.stops[1].color === resolveStop(settings.stops[0]),
-      `${settings.stops[1].color} vs ${resolveStop(settings.stops[0])}`);
+    // ── Gradient switch with one colour (#46): it adds a second colour instead of being disabled ──
+    const switchNode = m.switchButton;
+    const switchState = () =>
+      `${settings.stops.map((s) => `${s.id}:${s.kind}${s.color ? ` ${s.color}` : ""}`).join(", ")}; gradient ${settings.gradient}, ` +
+      `aria-checked ${switchNode.getAttribute("aria-checked")}, disabled ${switchNode.disabled}, focus .${document.activeElement?.className}`;
+    check(46, "One stop → switch enabled and off, no row tooltip",
+      settings.stops.length === 1 && !switchNode.disabled && switchNode.getAttribute("aria-checked") === "false" &&
+        !settings.gradient && !m.gradientRow.title && !switchNode.title,
+      `${switchState()}, row title "${m.gradientRow.title}"`);
+    const onlyStop = { ...settings.stops[0] };
+    switchNode.focus();
+    click(switchNode);
+    await sleep(20);
+    const openAfterSwitch = m.root.isConnected && modal === m;
+    check(46, "Switch on with one colour → a copy of it after it (theme stays theme), gradient on, the new dot selected",
+      settings.stops.length === 2 && settings.gradient && settings.stops[0].id === onlyStop.id &&
+        settings.stops[1].kind === onlyStop.kind && settings.stops[1].color === onlyStop.color && selectionIs(settings.stops[1].id),
+      `${switchState()}; ${selection()}`);
+    check(46, "…focus stays on the switch, updated in place; Spread row enabled; modal still open",
+      openAfterSwitch && document.activeElement === switchNode && m.switchButton === switchNode && switchNode.isConnected &&
+        switchNode.getAttribute("aria-checked") === "true" && m.modeButtons.every((b) => !b.disabled),
+      `${switchState()}, Spread disabled ${m.modeButtons.map((b) => b.disabled).join()}, open ${openAfterSwitch}`);
+    stillOpen("switching the gradient on with one colour");
+    click(m.switchButton);
+    check(46, "Switch off → both stops kept, colour 2 dimmed",
+      settings.stops.length === 2 && !settings.gradient && dots()[1]?.classList.contains("gpb-unused"), switchState());
+    click(m.switchButton);
+    check(46, "Switch on again with two colours → no third colour added",
+      settings.stops.length === 2 && settings.gradient && !dots()[1]?.classList.contains("gpb-unused"), switchState());
 
     const foreign = [m.root, ...m.root.querySelectorAll("*")].filter(
       (el) => (el.id && !el.id.startsWith("gpb-")) || [...el.classList].some((c) => !c.startsWith("gpb-"))
@@ -1790,8 +1802,9 @@
     m.removeItem.click();
     await sleep(20);
     stillOpen("Remove in the dot menu");
-    check(5, "Remove down to one stop → gradient off, switch disabled, menu closed",
-      settings.stops.length === 1 && !settings.gradient && m.switchButton.disabled && !menuShown(),
+    check(5, "Remove down to one stop → gradient off, switch off but enabled (#46), menu closed",
+      settings.stops.length === 1 && !settings.gradient && m.switchButton.getAttribute("aria-checked") === "false" &&
+        !m.switchButton.disabled && !menuShown(),
       `${settings.stops.length} stop(s), gradient ${settings.gradient}`);
     check(35, "Removing the selected (last) dot selects the new last one", selectionIs(settings.stops[0].id), selection());
 
@@ -1834,6 +1847,14 @@
     check(33, "A click elsewhere in the modal closes the menu", !menuShown(), "");
     stillOpen("clicking away from the dot menu");
 
+    const lastBeforeAdd = { ...settings.stops[settings.stops.length - 1] };
+    m.addButton.click();
+    stillOpen("adding a colour");
+    const added = settings.stops[settings.stops.length - 1];
+    check(35, "+ Add colour selects the new dot", selectionIs(added.id), selection());
+    check(4, "New stop = a copy of the last stop (theme stays theme, #46)",
+      added.id !== lastBeforeAdd.id && added.kind === lastBeforeAdd.kind && added.color === lastBeforeAdd.color,
+      `${JSON.stringify(added)} after ${JSON.stringify(lastBeforeAdd)}`);
     for (let i = 0; i < MAX_STOPS + 2; i++) m.addButton.click();
     check(4, "Add stops at 8, button disabled", settings.stops.length === MAX_STOPS && m.addButton.disabled,
       `${settings.stops.length} stops, disabled ${m.addButton.disabled}`);
