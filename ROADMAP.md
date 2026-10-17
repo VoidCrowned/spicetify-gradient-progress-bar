@@ -2,6 +2,12 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.4.0 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#49](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/49) | Stepper (−\|+) after the colour dots; Delete/Backspace removes a focused dot | ui | ⏳ |
+
 ## v1.3.0 — released 2026-10-17
 
 | # | Issue | Area | Status |
@@ -99,7 +105,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-Nothing is planned after v1.3.0 yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on the next Spicetify release (root cause and upstream fix noted there).
+v1.4.0 (#49) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
 
 ## Future
 
@@ -113,7 +119,6 @@ Agreed ideas, not scheduled.
 | [#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21) | Presets and import/export | |
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
 | [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
-| [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) | Retest with Hazy settings changes once Spicetify's Topbar works | the two Hazy items moved from #14 |
 
 ## Not planned
 
