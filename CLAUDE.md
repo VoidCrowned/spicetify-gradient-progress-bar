@@ -46,6 +46,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 | `.github/scripts/purge-jsdelivr.sh` | The purge-and-poll logic both workflows run (`--if-stale` for the heal). |
 | `ROADMAP.md` | Milestones → issues. Keep in sync. |
 | `preview.png` | Marketplace screenshot (#13). |
+| `LICENSE` | WTFPL v2, byte-identical to https://www.wtfpl.net/txt/copying/ (`.gitattributes` keeps it `-text`). |
 
 ## Conventions
 

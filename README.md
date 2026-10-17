@@ -71,3 +71,7 @@ Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md
 
 - [Spicetify](https://spicetify.app)
 - [Hazy](https://github.com/Astromations/Hazy) by Astromations and [playback-bar-waveform](https://github.com/Konsl/spicetify-extensions) by Konsl — the setups this was built and tested against.
+
+## Licence
+
+Copyright © 2026 VoidCrowned. This program is free software. It comes without any warranty, to the extent permitted by applicable law. You can redistribute it and/or modify it under the terms of the Do What The Fuck You Want To Public License, Version 2, as published by Sam Hocevar. See [LICENSE](LICENSE) or http://www.wtfpl.net/ for more details.

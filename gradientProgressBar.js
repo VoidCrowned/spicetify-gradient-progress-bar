@@ -3,6 +3,7 @@
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
+// LICENSE: WTFPL v2, see LICENSE
 //
 // Compatibility rules (details in CLAUDE.md → Hard rules):
 //  1. Every rule is scoped to the song progress bar — the volume slider never changes.
