@@ -2,6 +2,14 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.3.0 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#46](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/46) | Gradient switch with one colour adds a second colour | ui | ⏳ |
+| [#47](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/47) | Small + after the colour dots replaces "+ Add colour"; Reset centred; help line | ui | ⏳ |
+| [#48](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/48) | Uneven margin below the help text | ui, bug | ⏳ |
+
 ## v1.2.5 — released 2026-10-16
 
 | # | Issue | Area | Status |
@@ -91,7 +99,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-v1.2.3 (#44) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on the next Spicetify release (root cause and upstream fix noted there).
+v1.3.0 (#46, #47, #48) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2), with [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) (Hazy retest once Spicetify's Topbar works) waiting on the next Spicetify release (root cause and upstream fix noted there).
 
 ## Future
 
