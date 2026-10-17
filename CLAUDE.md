@@ -100,7 +100,7 @@ Spotify's own rules (relevant parts):
 
 - Touches the bar only via variables, single-class selectors, no `!important`:
   `.progress-bar { --bg-color: rgba(255, 555, 255, 0.2); --fg-color: var(--spice-button); --is-active-fg-color: var(--spice-button-active); }` plus a box-shadow on `.x-progressBar-sliderArea`. (`555` is a typo; Chromium clamps it.)
-- `--spice-button` is set **at runtime** as an inline style on `:root` by `hazy.js` on every `songchange`: the album-art colour, or the user's fixed "Custom color". Never read theme colours from a theme's `color.ini` — only the live computed value, or better, `var(--spice-button)` in CSS.
+- `--spice-button` is set **at runtime** as an inline style on `:root` by `hazy.js` on every `songchange`: with *Custom color* on, the user's fixed colour; otherwise the most frequent pixel colour (very dark and near-white pixels skipped) of Hazy's background image, which is the album art, or the user's picture when *Custom background* is on (then constant across songs). There is no Spotify-green fallback. Verified with the maintainer, 17 Oct (#38). Never read theme colours from a theme's `color.ini` — only the live computed value, or better, `var(--spice-button)` in CSS.
 - `--spice-rgb-button` is stale under Hazy: it keeps the colour scheme's value while `--spice-button` changes. Tint with `color-mix(in srgb, var(--spice-button) 30%, transparent)`, never `rgba(var(--spice-rgb-button), …)` (#40). The other `--spice-rgb-*` variables are fine; Hazy doesn't change them at runtime.
 - Hazy calls `document.getElementById("color-input")` and styles generic classes globally (`.slider`, `.toggle`, `.toggleWrapper`, `select`). Never use those ids/classes.
 
