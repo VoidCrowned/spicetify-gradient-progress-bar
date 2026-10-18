@@ -402,7 +402,12 @@
   // `rerender: false` for picker edits — the dots are updated in place instead.
   function update({ rerender = true } = {}) {
     applyCss();
-    if (modal) rerender ? renderModal() : renderPreview();
+    if (modal) {
+      rerender ? renderModal() : renderPreview();
+      renderPresetStates();
+    }
+    // An Undo for applied settings would throw away later edits, so any other change drops it (#21).
+    if (pendingUndo?.after && pendingUndo.after !== JSON.stringify(settings)) clearUndo();
     saveSettings();
   }
 
@@ -545,6 +550,7 @@
   // outline, middle line included (+ is raised over −'s edge), like Reset's border.
   const MODAL_CSS = `
 .gpb-modal { display: flex; flex-direction: column; gap: 20px; padding-top: 20px; color: var(--spice-text); }
+.gpb-modal [hidden] { display: none; }
 .gpb-gradient-row { display: flex; align-items: center; justify-content: space-between; }
 .gpb-label { font-weight: 700; }
 .gpb-switch { position: relative; flex: none; width: 40px; height: 22px; padding: 0; border: 0; border-radius: 11px; background-color: rgba(var(--spice-rgb-text), .3); cursor: pointer; transition: background-color .15s; }
@@ -617,6 +623,30 @@
 .gpb-field[aria-invalid="true"] { border-color: var(--spice-notification-error, #e91429); }
 .gpb-hex { flex: none; width: 10ch; font-family: ui-monospace, Consolas, monospace; text-align: left; }
 .gpb-colour-picker .gpb-button { align-self: stretch; padding: 6px 12px; font-size: .875rem; }
+.gpb-presets > * { margin: 0; }
+.gpb-presets > * + * { margin-top: 8px; }
+.gpb-presets > .gpb-undo:not(.gpb-has-undo) { margin-top: 0; }
+.gpb-presets-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gpb-text-button { display: inline-grid; padding: 2px 8px; border: 0; border-radius: 500px; background: none; color: var(--spice-subtext); font: inherit; font-size: .8125rem; font-weight: 700; cursor: pointer; }
+.gpb-text-button > span { grid-area: 1 / 1; }
+.gpb-text-button:hover:not(:disabled) { background-color: rgba(var(--spice-rgb-text), .1); color: var(--spice-text); }
+.gpb-text-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 1px; }
+.gpb-sizer { visibility: hidden; }
+.gpb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gpb-chip { display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box; height: 28px; padding: 0 12px 0 7px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .8125rem; cursor: pointer; }
+.gpb-chip:hover:not(:disabled) { border-color: var(--spice-text); }
+.gpb-chip[aria-pressed="true"], .gpb-chip[aria-pressed="true"]:hover:not(:disabled), .gpb-chip.gpb-armed, .gpb-chip.gpb-armed:hover:not(:disabled) { border-color: var(--spice-button); }
+.gpb-chip.gpb-armed { background-color: color-mix(in srgb, var(--spice-button) 20%, transparent); }
+.gpb-chip:disabled { opacity: .5; cursor: not-allowed; }
+.gpb-chip:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-save-chip { padding: 0 12px; color: var(--spice-subtext); }
+.gpb-save-chip:hover:not(:disabled) { color: var(--spice-text); }
+.gpb-chip-swatch { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.gpb-chip-text { display: inline-grid; justify-items: center; }
+.gpb-chip-text > span { grid-area: 1 / 1; white-space: nowrap; }
+.gpb-name-field { flex: none; width: 18ch; height: 28px; padding: 0 12px; border-radius: 500px; text-align: left; }
+.gpb-undo { font-size: .8125rem; color: var(--spice-subtext); }
+.gpb-undo-button { padding: 2px 4px; color: var(--spice-text); text-decoration: underline; }
 `;
   // Two columns from 420 px of content (202 + 16 + 202), stacked below that. Flex-wrap rather
   // than a container query: inline-size containment could collapse a shrink-to-fit modal.
@@ -663,6 +693,9 @@
       <div class="gpb-popover gpb-menu" role="menu" aria-label="Colour actions" hidden>
         <button type="button" role="menuitem" class="gpb-menu-item gpb-duplicate">Duplicate</button>
         <button type="button" role="menuitem" class="gpb-menu-item gpb-remove">Remove</button>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-rename" hidden>Rename</button>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-update-preset" hidden>Update to current colours</button>
+        <button type="button" role="menuitem" class="gpb-menu-item gpb-delete-preset" hidden>Delete</button>
       </div>
       <span class="gpb-announce" aria-live="polite"></span>
       <div class="gpb-gradient-row">
@@ -677,6 +710,16 @@
           </div>
         </div>
         <p class="gpb-spread-hint" id="gpb-spread-hint"></p>
+      </div>
+      <div class="gpb-presets">
+        <div class="gpb-presets-row">
+          <span class="gpb-label" id="gpb-presets-label">Presets</span>
+        </div>
+        <div class="gpb-chips" role="group" aria-labelledby="gpb-presets-label">
+          <button type="button" class="gpb-chip gpb-save-chip">+ Save</button>
+          <input type="text" class="gpb-field gpb-name-field" maxlength="${PRESET_NAME_MAX}" spellcheck="false" autocomplete="off" aria-label="Preset name" hidden>
+        </div>
+        <p class="gpb-undo" aria-live="polite"><span class="gpb-undo-text"></span><button type="button" class="gpb-text-button gpb-undo-button" hidden>Undo</button></p>
       </div>
       <div class="gpb-preview"></div>
       <div class="gpb-dots">
@@ -716,6 +759,14 @@
       modes: root.querySelector(".gpb-modes"),
       modeButtons: [...root.querySelectorAll(".gpb-mode")],
       spreadHint: root.querySelector(".gpb-spread-hint"),
+      presets: root.querySelector(".gpb-presets"),
+      presetsRow: root.querySelector(".gpb-presets-row"),
+      chips: root.querySelector(".gpb-chips"),
+      saveChip: root.querySelector(".gpb-save-chip"),
+      nameField: root.querySelector(".gpb-name-field"),
+      undoLine: root.querySelector(".gpb-undo"),
+      undoText: root.querySelector(".gpb-undo-text"),
+      undoButton: root.querySelector(".gpb-undo-button"),
       preview: root.querySelector(".gpb-preview"),
       dotsLine: root.querySelector(".gpb-dots"),
       stopsRow: root.querySelector(".gpb-stops"),
@@ -730,6 +781,9 @@
       announce: root.querySelector(".gpb-announce"),
       duplicateItem: root.querySelector(".gpb-duplicate"),
       removeItem: root.querySelector(".gpb-remove"),
+      renameItem: root.querySelector(".gpb-rename"),
+      updatePresetItem: root.querySelector(".gpb-update-preset"),
+      deletePresetItem: root.querySelector(".gpb-delete-preset"),
       picker: root.querySelector(".gpb-colour-picker"),
       sv: root.querySelector(".gpb-sv"),
       svHandle: root.querySelector(".gpb-sv-handle"),
@@ -765,12 +819,14 @@
     enableDotMenu(m);
     enableColourPicker(m);
     enableReset(m);
+    enablePresets(m);
 
     Spicetify.PopupModal.display({ title: "Gradient Progress Bar", content: root });
     evenPopupBottom(root);
     modal = m;
     selectedId = settings.stops[0].id; // the first dot is selected on open
     renderModal();
+    renderChips(m);
     watchModalClose(m);
     watchThemeColour(m);
     watchPopovers(m);
@@ -897,24 +953,303 @@
       timer = setTimeout(disarm, RESET_CONFIRM_MS);
     });
     button.addEventListener("blur", () => armed() && disarm());
+    disarmOnOutsideInput(m, () => (armed() ? button : null), disarm);
+    m.cleanups.push(disarm); // clears the timer when the modal closes
+  }
 
-    // Any other click or key disarms; Enter/Space on the button are the confirmation itself.
+  // An armed two-step button (Reset, a preset chip) disarms on Escape — stopped there, so the
+  // modal stays — and on any pointerdown, click or keydown elsewhere. Enter/Space on the button
+  // itself is the confirmation. `armedEl()` returns the armed element or null.
+  function disarmOnOutsideInput(m, armedEl, disarm) {
     const listen = (type, handler) => {
       document.addEventListener(type, handler, true);
       m.cleanups.push(() => document.removeEventListener(type, handler, true));
     };
-    const elsewhere = (e) => armed() && !button.contains(e.target) && disarm();
+    const elsewhere = (e) => {
+      const el = armedEl();
+      if (el && !el.contains(e.target)) disarm();
+    };
     listen("pointerdown", elsewhere);
     listen("click", elsewhere);
     listen("keydown", (e) => {
-      if (!armed()) return;
+      const el = armedEl();
+      if (!el) return;
       if (e.key === "Escape") {
         e.preventDefault();
-        e.stopPropagation(); // Reset disarms, the modal stays
+        e.stopPropagation();
         disarm();
-      } else if (!button.contains(e.target)) disarm();
+      } else if (!el.contains(e.target)) disarm();
     });
-    m.cleanups.push(disarm); // clears the timer when the modal closes
+  }
+
+  // ── Presets row (#21) ──
+  // Chips for the built-ins, then own presets, then + Save. Applying is two-step like Reset:
+  // the first click arms the chip ("Apply?"; hidden sizers keep its width), the second applies;
+  // one click is enough when nothing would be lost (nothingToLose()). Undo for 10 s after
+  // applying, importing or deleting. Arming changes only a label and a class, in place;
+  // re-rendering the chip row (Save, Rename, Update, Delete) is deferred and closes the menu
+  // first, so a clicked chip or menu item is never detached during its own click (#26).
+
+  const UNDO_MS = 10000;
+  const APPLY_LABEL = "Apply?";
+  const SAVE_LABEL = "Save the current settings as a preset";
+  const SAVE_FULL_LABEL = `Up to ${MAX_PRESETS} presets`;
+  const OWN_PRESET_HINT = "Right-click to rename, update or delete";
+
+  const chipEl = (id) => modal?.chips.querySelector(`.gpb-preset-chip[data-preset="${CSS.escape(id)}"]`) ?? null;
+  const isOwnPreset = (id) => presets.some((p) => p.id === id);
+
+  function enablePresets(m) {
+    m.chips.addEventListener("click", (e) => {
+      const chip = e.target.closest(".gpb-chip");
+      if (!chip || chip.disabled) return;
+      if (chip === m.saveChip) startNaming(m, "save");
+      else clickChip(m, chip);
+    });
+    // Own chips only: built-ins can't be renamed, updated or deleted, so they have no menu.
+    m.chips.addEventListener("contextmenu", (e) => {
+      const chip = e.target.closest(".gpb-preset-chip");
+      if (!chip || !isOwnPreset(chip.dataset.preset)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = chip.dataset.preset;
+      if (popover?.id === id && performance.now() - popover.openedAt < 500) return; // opened from keydown
+      const r = chip.getBoundingClientRect();
+      const onChip = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      openChipMenu(id, onChip ? { at: { x: e.clientX, y: e.clientY } } : { keyboard: true });
+    });
+    m.chips.addEventListener("keydown", (e) => {
+      const chip = e.target.closest(".gpb-preset-chip");
+      if (!chip || !isOwnPreset(chip.dataset.preset) || !(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) return;
+      e.preventDefault();
+      openChipMenu(chip.dataset.preset, { keyboard: true });
+    });
+    m.chips.addEventListener("focusout", (e) => m.armed?.chip === e.target && disarmChip(m));
+    disarmOnOutsideInput(m, () => m.armed?.chip ?? null, () => disarmChip(m));
+
+    m.nameField.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        stopNaming(m, { commit: true });
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation(); // the field closes, not the modal
+        stopNaming(m, { refocus: true });
+      }
+    });
+    m.nameField.addEventListener("blur", () => stopNaming(m));
+
+    m.renameItem.addEventListener("click", () => runChipAction((id) => startNaming(m, "rename", id)));
+    m.updatePresetItem.addEventListener("click", () =>
+      runChipAction((id) => {
+        if (pendingUndo?.kind === "preset") clearUndo(); // a restored preset could clash with this change
+        if (updatePreset(id)) renderChipsLater(m, id);
+      })
+    );
+    m.deletePresetItem.addEventListener("click", () => runChipAction((id) => deleteWithUndo(m, id)));
+    m.undoButton.addEventListener("click", runUndo);
+    m.cleanups.push(() => {
+      disarmChip(m);
+      clearUndo();
+    });
+  }
+
+  function clickChip(m, chip) {
+    const preset = presetById(chip.dataset.preset);
+    if (!preset) return;
+    if (m.armed?.chip !== chip && !nothingToLose()) return armChip(m, chip, preset);
+    disarmChip(m);
+    applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
+  }
+
+  function armChip(m, chip, preset) {
+    disarmChip(m);
+    chip.classList.add("gpb-armed");
+    chip.querySelector(".gpb-chip-label").textContent = APPLY_LABEL;
+    chip.setAttribute("aria-label", `Apply "${preset.name}"?`);
+    m.armed = { chip, timer: setTimeout(() => disarmChip(m), RESET_CONFIRM_MS) };
+  }
+
+  function disarmChip(m) {
+    if (!m.armed) return;
+    const { chip, timer } = m.armed;
+    m.armed = null;
+    clearTimeout(timer);
+    const name = presetById(chip.dataset.preset)?.name ?? "";
+    chip.classList.remove("gpb-armed");
+    chip.querySelector(".gpb-chip-label").textContent = name;
+    chip.setAttribute("aria-label", name);
+  }
+
+  // Replaces the settings (selection back on the first dot) and offers Undo for the old ones.
+  function applySettings(next, message, focusAfterUndo = null) {
+    const previous = structuredClone(settings);
+    settings = next;
+    selectedId = settings.stops[0].id;
+    update();
+    offerUndo(message, (hadFocus) => {
+      settings = previous;
+      selectedId = previous.stops[0].id;
+      update();
+      if (hadFocus && focusAfterUndo?.isConnected) focusAfterUndo.focus({ preventScroll: true });
+    }, { trackSettings: true });
+  }
+
+  function deleteWithUndo(m, id) {
+    const removed = deletePreset(id);
+    if (!removed) return;
+    renderChipsLater(m, (presets[removed.index] ?? presets[removed.index - 1])?.id ?? "save");
+    offerUndo(`Deleted "${removed.preset.name}"`, (hadFocus) => {
+      restorePreset(removed);
+      renderChipsLater(m, hadFocus ? removed.preset.id : null);
+    }, { kind: "preset" });
+  }
+
+  // ── Undo (#21) ──
+  // One pending undo at a time: a new action replaces it. It lasts UNDO_MS, ends when the modal
+  // closes, and a settings undo also ends when the settings change some other way (update()).
+
+  let pendingUndo = null; // { message, kind, restore(hadFocus), after, timer }
+
+  function offerUndo(message, restore, { trackSettings = false, kind = "settings" } = {}) {
+    clearUndo();
+    const after = trackSettings ? JSON.stringify(settings) : null;
+    pendingUndo = { message, kind, restore, after, timer: setTimeout(clearUndo, UNDO_MS) };
+    renderUndo();
+  }
+
+  function clearUndo() {
+    if (!pendingUndo) return;
+    clearTimeout(pendingUndo.timer);
+    pendingUndo = null;
+    renderUndo();
+  }
+
+  // The Undo button is hidden, not removed, in its own click (#26).
+  function runUndo() {
+    const undo = pendingUndo;
+    if (!undo) return;
+    const hadFocus = !!modal && document.activeElement === modal.undoButton;
+    clearUndo();
+    undo.restore(hadFocus);
+  }
+
+  function renderUndo() {
+    if (!modal) return;
+    modal.undoLine.classList.toggle("gpb-has-undo", !!pendingUndo);
+    modal.undoText.textContent = pendingUndo ? `${pendingUndo.message} · ` : "";
+    modal.undoButton.hidden = !pendingUndo;
+  }
+
+  // ── Chip row rendering ──
+
+  function renderChips(m) {
+    disarmChip(m);
+    if (!m.naming) m.saveChip.after(m.nameField);
+    for (const chip of m.chips.querySelectorAll(".gpb-preset-chip")) chip.remove();
+    for (const preset of [...BUILT_IN_PRESETS, ...presets]) m.saveChip.before(presetChip(preset));
+    const full = presets.length >= MAX_PRESETS;
+    m.saveChip.disabled = full;
+    m.saveChip.title = full ? SAVE_FULL_LABEL : SAVE_LABEL;
+    renderPresetStates();
+  }
+
+  // After Save, Rename, Update and Delete: deferred, with the menu closed first (#26).
+  function renderChipsLater(m, focusId = null) {
+    closePopover();
+    disarmChip(m);
+    setTimeout(() => {
+      if (modal !== m) return;
+      renderChips(m);
+      const target = focusId === "save" ? m.saveChip : focusId ? chipEl(focusId) : null;
+      target?.focus({ preventScroll: true });
+    }, 0);
+  }
+
+  // A pill: a 12 px swatch painted with the preset's fillImage(), and the name. Names are user
+  // text, so they only ever go in through textContent.
+  function presetChip(preset) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "gpb-chip gpb-preset-chip";
+    chip.dataset.preset = preset.id;
+    chip.setAttribute("aria-pressed", "false");
+    chip.setAttribute("aria-label", preset.name);
+    chip.title = preset.builtIn ? preset.name : `${preset.name}\n${OWN_PRESET_HINT}`;
+    chip.innerHTML =
+      '<span class="gpb-chip-swatch" aria-hidden="true"></span><span class="gpb-chip-text">' +
+      '<span class="gpb-chip-label" aria-live="polite"></span><span class="gpb-sizer" aria-hidden="true"></span>' +
+      `<span class="gpb-sizer" aria-hidden="true">${APPLY_LABEL}</span></span>`;
+    chip.querySelector(".gpb-chip-swatch").style.backgroundImage = fillImage(presetSettings(preset));
+    chip.querySelector(".gpb-chip-label").textContent = preset.name;
+    chip.querySelector(".gpb-sizer").textContent = preset.name;
+    return chip;
+  }
+
+  // The chip whose settings equal the current ones is marked active.
+  function renderPresetStates() {
+    for (const chip of modal.chips.querySelectorAll(".gpb-preset-chip")) {
+      const preset = presetById(chip.dataset.preset);
+      chip.setAttribute("aria-pressed", String(!!preset && matchesPreset(preset)));
+    }
+  }
+
+  // ── Naming (+ Save, Rename) ──
+  // One inline name field (not a popover) takes the place of the + Save chip or of the chip
+  // being renamed. Enter saves, Escape cancels, and so does leaving the field.
+
+  function startNaming(m, mode, id = null) {
+    if (m.naming) return;
+    const preset = mode === "rename" ? presets.find((p) => p.id === id) : null;
+    const chip = mode === "rename" ? chipEl(id) : m.saveChip;
+    if (!chip || (mode === "rename" && !preset)) return;
+    disarmChip(m);
+    m.naming = { mode, id, chip };
+    chip.before(m.nameField);
+    chip.hidden = true; // hidden, not removed: it may be the element being clicked (#26)
+    m.nameField.value = preset ? preset.name : defaultPresetName();
+    m.nameField.setAttribute("aria-label", preset ? `New name for "${preset.name}"` : "Preset name");
+    m.nameField.hidden = false;
+    m.nameField.focus({ preventScroll: true });
+    m.nameField.select();
+  }
+
+  function stopNaming(m, { commit = false, refocus = false } = {}) {
+    const naming = m.naming;
+    if (!naming) return;
+    m.naming = null;
+    m.nameField.hidden = true;
+    m.saveChip.after(m.nameField);
+    naming.chip.hidden = false;
+    if (!commit) {
+      if (refocus) naming.chip.focus({ preventScroll: true });
+      return;
+    }
+    if (pendingUndo?.kind === "preset") clearUndo(); // a restored preset could clash with this change
+    if (naming.mode === "save") renderChipsLater(m, addPreset(m.nameField.value)?.id ?? "save");
+    else {
+      renamePreset(naming.id, m.nameField.value); // an empty name keeps the old one
+      renderChipsLater(m, naming.id);
+    }
+  }
+
+  // ── Chip menu ──
+  // The dot menu's popover (#33) with the preset items instead: inside the modal root, hidden,
+  // never removed.
+
+  function openChipMenu(id, { at = null, keyboard = false } = {}) {
+    const anchor = chipEl(id);
+    if (!anchor || !isOwnPreset(id)) return;
+    disarmChip(modal);
+    setMenuKind("chip");
+    if (showPopover(id, modal.menu, at, anchor) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
+  }
+
+  function runChipAction(action) {
+    if (!popover) return;
+    const { id } = popover;
+    closePopover();
+    action(id);
   }
 
   // ── Selection ──
@@ -953,9 +1288,9 @@
   const POPOVER_GAP = 8; // between a dot and a popover anchored to it
 
   // `at` is a viewport point (menu at the cursor); without it the popover sits under the dot.
-  function showPopover(id, el, at = null) {
+  // `anchor` is a dot by default, or a preset chip (#21).
+  function showPopover(id, el, at = null, anchor = dotEl(id)) {
     closePopover();
-    const anchor = dotEl(id);
     if (!anchor) return false;
     popover = { id, el, anchor, at, openedAt: performance.now() };
     el.hidden = false;
@@ -1055,9 +1390,17 @@
     m.removeItem.addEventListener("click", () => runMenuAction(removeStop));
   }
 
-  const menuItems = () => [...modal.menu.querySelectorAll(".gpb-menu-item:not(:disabled)")];
+  const menuItems = () => [...modal.menu.querySelectorAll(".gpb-menu-item:not(:disabled):not([hidden])")];
+
+  // One menu element for dots (Duplicate, Remove) and own preset chips (Rename, Update, Delete).
+  function setMenuKind(kind) {
+    for (const item of [modal.duplicateItem, modal.removeItem]) item.hidden = kind !== "dot";
+    for (const item of [modal.renameItem, modal.updatePresetItem, modal.deletePresetItem]) item.hidden = kind !== "chip";
+    modal.menu.setAttribute("aria-label", kind === "dot" ? "Colour actions" : "Preset actions");
+  }
 
   function openMenu(id, { at = null, keyboard = false } = {}) {
+    setMenuKind("dot");
     modal.duplicateItem.disabled = settings.stops.length >= MAX_STOPS;
     modal.removeItem.disabled = settings.stops.length <= 1;
     if (showPopover(id, modal.menu, at) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
@@ -2010,8 +2353,8 @@
       `after .${m.picker.previousElementSibling?.className}, before .${m.picker.nextElementSibling?.className}, ` +
         `position ${getComputedStyle(m.picker).position}`);
 
-    check(15, "Spread row sits between the Gradient row and the preview: a radiogroup of three radio buttons",
-      m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.preview &&
+    check(15, "Spread row sits between the Gradient row and the Presets row (#21): a radiogroup of three radio buttons",
+      m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.presets &&
         m.modes.getAttribute("role") === "radiogroup" && m.modes.getAttribute("aria-labelledby") === "gpb-spread-label" &&
         m.modeButtons.length === 3 && m.modeButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") &&
         m.modeButtons.map((b) => b.textContent).join() === "Compress,Anchored,Slide",
