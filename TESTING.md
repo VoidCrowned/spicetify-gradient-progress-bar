@@ -72,6 +72,7 @@ It covers:
 - The settings stay open after every picker, menu and preset action; spacing under the title and above the help text.
 - Bottom margin (#48): with the content scrolled to the end, the space below the help text matches the side margin (within 4 px, to the dialog's edges); the detail lists each ancestor's share. The next popup opened by any extension has none of our inline padding.
 - Modal clean-up: listeners and observers removed on close, no clashes with Hazy's ids and classes.
+- Environment (#55): the Spicetify version (`Spicetify.Config.version`, or "unknown") is reported; `spicetifyFixes` lists spicetify-fixes' states when it runs (information only).
 - Settings: invalid saved settings fall back to defaults with one warning; saves are debounced and survive a save–load round trip.
 - Presets and share codes (#21):
   - store: save → load round-trip in `gpb:presets`; invalid entries, duplicate ids and any beyond 12 dropped with one warning; a corrupt or unknown key gives an empty list and one warning; names trimmed, ≤ 24 characters, unique (built-ins included, any case); built-ins can't be deleted, renamed or updated;

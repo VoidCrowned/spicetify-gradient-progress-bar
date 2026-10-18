@@ -2151,12 +2151,26 @@
   const loadedCopies = () =>
     [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => /gradientProgressBar.js/i.test(src));
 
+  // A function declaration, so status() can use it from the first line on (#55).
+  function spicetifyVersion() {
+    return window.Spicetify?.Config?.version ?? "unknown";
+  }
+
+  // The states reported by the separate spicetify-fixes extension (window.__fixes), if it runs: its
+  // workarounds for the top bar and MenuItem make ours work too. Read only, never relied on (#55).
+  function otherFixes() {
+    const fixes = window.__fixes?.fixes;
+    return Array.isArray(fixes) ? Object.fromEntries(fixes.map((fix) => [fix?.id, fix?.state])) : null;
+  }
+
   function environment() {
     return {
       extension: VERSION,
       source: SOURCE,
       copies: loadedCopies(),
       spotify: Spicetify.Platform?.version ?? null,
+      spicetify: spicetifyVersion(), // #55: which Spicetify release fixed the top bar and MenuItem
+      spicetifyFixes: otherFixes(), // #55: whether a separate fix extension is what makes them work
       theme: Spicetify.Config?.current_theme ?? null,
       colourScheme: Spicetify.Config?.color_scheme ?? null,
       extensions: Spicetify.Config?.extensions ?? null,
@@ -2189,6 +2203,7 @@
       results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
 
     const env = environment();
+    check(55, "The environment block reports the Spicetify version", typeof env.spicetify === "string" && !!env.spicetify, env.spicetify);
     const savedSettings = structuredClone(settings);
     const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
     const savedPresets = structuredClone(presets); // #21
@@ -3875,6 +3890,7 @@
       entryErrors: startup.entryErrors,
       error: startup.error,
       spotify: window.Spicetify?.Platform?.version ?? null,
+      spicetify: spicetifyVersion(), // #55
       apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar", "ReactJSX"].map((n) => [n, !!api(n)])),
       menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() },
       topbar: { created: !!topbarButton, connected: !!topbarButton?.element?.isConnected },

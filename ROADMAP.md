@@ -8,7 +8,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 |---|---|---|---|
 | [#53](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/53) | New built-in presets (Void, Sunset, Aurora, Neon, Fairy) in their own row | ui, enhancement | ✅ |
 | [#54](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/54) | Export copies straight to the clipboard; the button shows "Copied" | bug, ui, compatibility | ✅ |
-| [#55](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/55) | Spotify 1.3.5.3058 re-verified; Topbar and profile menu work again | compatibility, documentation | ⏳ |
+| [#55](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/55) | Spotify 1.3.5.3058 re-verified; Topbar and profile menu work again | compatibility, documentation | ✅ |
 | [#56](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/56) | Inline copy button inside the hex field | ui, enhancement | ⏳ |
 
 ## v1.6.0 — released 2026-10-18
