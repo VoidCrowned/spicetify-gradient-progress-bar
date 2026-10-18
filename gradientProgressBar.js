@@ -646,6 +646,14 @@
 .gpb-chip-text > span { grid-area: 1 / 1; white-space: nowrap; }
 .gpb-name-field { flex: none; width: 18ch; height: 28px; padding: 0 12px; border-radius: 500px; text-align: left; }
 .gpb-undo { font-size: .8125rem; color: var(--spice-subtext); }
+.gpb-presets-tools { display: flex; gap: 4px; }
+.gpb-text-button[aria-expanded="true"] { color: var(--spice-text); }
+.gpb-code-output, .gpb-code-input { font-family: ui-monospace, Consolas, monospace; font-size: .8125rem; text-align: left; }
+.gpb-import-row { display: flex; align-items: center; gap: 8px; }
+.gpb-import-row > .gpb-code-input { flex: 1; }
+.gpb-import-row > .gpb-button { flex: none; align-self: center; padding: 4px 14px; font-size: .875rem; }
+.gpb-import-error { margin: 0; font-size: .75rem; color: var(--spice-notification-error, #e91429); }
+.gpb-import-error:not(:empty) { margin-top: 6px; }
 .gpb-undo-button { padding: 2px 4px; color: var(--spice-text); text-decoration: underline; }
 `;
   // Two columns from 420 px of content (202 + 16 + 202), stacked below that. Flex-wrap rather
@@ -714,10 +722,22 @@
       <div class="gpb-presets">
         <div class="gpb-presets-row">
           <span class="gpb-label" id="gpb-presets-label">Presets</span>
+          <div class="gpb-presets-tools">
+            <button type="button" class="gpb-text-button gpb-copy-code"><span class="gpb-copy-label" aria-live="polite">${COPY_LABEL}</span><span class="gpb-sizer" aria-hidden="true">${COPY_LABEL}</span><span class="gpb-sizer" aria-hidden="true">${COPIED_LABEL}</span></button>
+            <button type="button" class="gpb-text-button gpb-import" aria-expanded="false" aria-controls="gpb-import-panel">Import</button>
+          </div>
         </div>
         <div class="gpb-chips" role="group" aria-labelledby="gpb-presets-label">
           <button type="button" class="gpb-chip gpb-save-chip">+ Save</button>
           <input type="text" class="gpb-field gpb-name-field" maxlength="${PRESET_NAME_MAX}" spellcheck="false" autocomplete="off" aria-label="Preset name" hidden>
+        </div>
+        <input type="text" class="gpb-field gpb-code-output" readonly spellcheck="false" aria-label="Share code (copy it from here)" hidden>
+        <div class="gpb-import-panel" id="gpb-import-panel" hidden>
+          <div class="gpb-import-row">
+            <input type="text" class="gpb-field gpb-code-input" spellcheck="false" autocomplete="off" placeholder="gpb1:…" aria-label="Paste a share code" aria-describedby="gpb-import-error">
+            <button type="button" class="gpb-button gpb-import-apply">Apply</button>
+          </div>
+          <p class="gpb-import-error" id="gpb-import-error" aria-live="polite"></p>
         </div>
         <p class="gpb-undo" aria-live="polite"><span class="gpb-undo-text"></span><button type="button" class="gpb-text-button gpb-undo-button" hidden>Undo</button></p>
       </div>
@@ -764,6 +784,14 @@
       chips: root.querySelector(".gpb-chips"),
       saveChip: root.querySelector(".gpb-save-chip"),
       nameField: root.querySelector(".gpb-name-field"),
+      copyButton: root.querySelector(".gpb-copy-code"),
+      copyLabel: root.querySelector(".gpb-copy-label"),
+      importButton: root.querySelector(".gpb-import"),
+      codeOutput: root.querySelector(".gpb-code-output"),
+      importPanel: root.querySelector(".gpb-import-panel"),
+      codeInput: root.querySelector(".gpb-code-input"),
+      importApply: root.querySelector(".gpb-import-apply"),
+      importError: root.querySelector(".gpb-import-error"),
       undoLine: root.querySelector(".gpb-undo"),
       undoText: root.querySelector(".gpb-undo-text"),
       undoButton: root.querySelector(".gpb-undo-button"),
@@ -1048,10 +1076,92 @@
     );
     m.deletePresetItem.addEventListener("click", () => runChipAction((id) => deleteWithUndo(m, id)));
     m.undoButton.addEventListener("click", runUndo);
+    enableSharing(m);
     m.cleanups.push(() => {
       disarmChip(m);
       clearUndo();
     });
+  }
+
+  // ── Sharing (#21) ──
+  // Copy code puts a gpb1: code on the clipboard; if that fails, the code shows in a selected
+  // read-only field instead. Import is an inline paste field, never navigator.clipboard.readText()
+  // (that asks for a permission). Opening the field is the deliberate step, so a valid code
+  // applies without arming, with Undo.
+
+  const COPY_LABEL = "Copy code";
+  const COPIED_LABEL = "Copied";
+  const COPIED_MS = 2000;
+  const IMPORT_ERROR = "Not a valid code";
+
+  function enableSharing(m) {
+    m.copyButton.addEventListener("click", () => copyCode(m));
+    m.codeOutput.addEventListener("blur", () => (m.codeOutput.hidden = true));
+    m.importButton.addEventListener("click", () => toggleImport(m));
+    m.importApply.addEventListener("click", () => importCode(m));
+    m.codeInput.addEventListener("input", () => setImportError(m, false));
+    m.codeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        importCode(m);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation(); // the field closes, not the modal
+        toggleImport(m, false);
+        m.importButton.focus({ preventScroll: true });
+      }
+    });
+    m.cleanups.push(() => clearTimeout(m.copiedTimer));
+  }
+
+  // Resolves to true when the code reached the clipboard, false when the fallback field shows.
+  async function copyCode(m) {
+    const code = encodeCode(settings);
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      if (modal !== m) return false;
+      m.codeOutput.value = code;
+      m.codeOutput.hidden = false;
+      m.codeOutput.focus({ preventScroll: true });
+      m.codeOutput.select();
+      return false;
+    }
+    if (modal !== m) return true;
+    m.codeOutput.hidden = true;
+    m.copyLabel.textContent = COPIED_LABEL; // in place; the sizers keep the width
+    clearTimeout(m.copiedTimer);
+    m.copiedTimer = setTimeout(() => (m.copyLabel.textContent = COPY_LABEL), COPIED_MS);
+    return true;
+  }
+
+  function toggleImport(m, open = m.importPanel.hidden) {
+    m.importPanel.hidden = !open;
+    m.importButton.setAttribute("aria-expanded", String(open));
+    if (!open) return;
+    m.codeInput.value = "";
+    setImportError(m, false);
+    m.codeInput.focus({ preventScroll: true });
+  }
+
+  function setImportError(m, invalid) {
+    if (invalid) m.codeInput.setAttribute("aria-invalid", "true");
+    else m.codeInput.removeAttribute("aria-invalid");
+    m.importError.textContent = invalid ? IMPORT_ERROR : "";
+  }
+
+  // An invalid code changes nothing. A valid one applies; the panel (with the clicked Apply in
+  // it) is hidden, not removed (#26).
+  function importCode(m) {
+    const next = decodeCode(m.codeInput.value);
+    if (!next) {
+      setImportError(m, true);
+      return false;
+    }
+    toggleImport(m, false);
+    m.importButton.focus({ preventScroll: true });
+    applySettings(next, "Imported code", m.importButton);
+    return true;
   }
 
   function clickChip(m, chip) {
