@@ -12,6 +12,8 @@ A [Spicetify](https://spicetify.app) extension that recolours Spotify's song pro
 - **Three ways to spread a gradient** — *Compress* fits the whole gradient between the start and the playhead, *Anchored* keeps the colours fixed to the bar and reveals them as the song plays, *Slide* moves a full-length gradient in with the playhead.
 - **Up to 8 colours**, edited in a built-in colour picker with R/G/B and hex input, reorderable by drag-and-drop.
 - **Theme colour stop** — a colour that follows your theme's accent instead of a fixed value. With themes that change their accent per song (like Hazy's album-art mode), the bar follows along.
+- **Presets** — four built-in gradients (Sunset, Ocean, Aurora, Neon) and up to 12 of your own, one click away, with Undo.
+- **Share codes** — copy your settings as a short code (`gpb1:…`) and paste someone else's to try it.
 - **Live preview** — changes show on the bar as you pick.
 - **Leaves everything else alone** — only the song progress bar changes; the volume slider, layout and your theme's other styling stay as they are. With default settings the extension changes nothing at all.
 
@@ -41,6 +43,9 @@ To uninstall: `spicetify config extensions gradientProgressBar.js-` then `spicet
 - **− | +** (the pill after the dots): **+** adds another colour, a copy of the last one, and selects it; with two or more, gradient mode switches on. Up to 8 colours. **−** removes the selected colour (the one with the ring); at least one colour always stays.
 - **Delete** or **Backspace** on a colour dot you've tabbed to removes that colour.
 - **Spread** (below the Gradient switch) picks how the gradient covers the bar: *Compress*, *Anchored* or *Slide*. The line below the buttons describes the active one.
+- **Presets** (below Spread): click a chip to apply it. If your current colours aren't saved anywhere, the chip first asks *Apply?*, and a second click applies it; Escape, waiting 3 seconds or clicking elsewhere cancels. After applying, *Undo* is there for 10 seconds. The built-ins only change the colours and keep your Spread choice; your own presets bring back everything they saved.
+- **+ Save** stores the current settings as your own preset: type a name and press Enter (Escape cancels). **Right-click your own preset** (or use the context-menu key) to **Rename** it, **Update** it to the current colours, or **Delete** it (with Undo).
+- **Copy code** puts a short code for the current settings on the clipboard (if that's not possible, the code shows selected so you can copy it yourself). **Import** opens a field: paste a code and press Enter or *Apply*; you can Undo it.
 - **Drag the dots** to reorder the gradient. With the keyboard, Alt + arrow keys move the focused colour (Alt + Home / End to the first or last place).
 - **Reset** (centred below the picker) goes back to the default: a single colour that follows your theme, no gradient. It asks for a second click to confirm: the button turns red and reads *Confirm reset?* for 3 seconds; waiting, pressing Escape or clicking anything else cancels.
 

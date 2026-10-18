@@ -1092,6 +1092,7 @@
   const COPY_LABEL = "Copy code";
   const COPIED_LABEL = "Copied";
   const COPIED_MS = 2000;
+  const CLIPBOARD_TIMEOUT_MS = 1500; // a clipboard write that never settles counts as failed
   const IMPORT_ERROR = "Not a valid code";
 
   function enableSharing(m) {
@@ -1118,7 +1119,10 @@
   async function copyCode(m) {
     const code = encodeCode(settings);
     try {
-      await navigator.clipboard.writeText(code);
+      await Promise.race([
+        navigator.clipboard.writeText(code),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS)),
+      ]);
     } catch {
       if (modal !== m) return false;
       m.codeOutput.value = code;
@@ -2066,6 +2070,8 @@
     const env = environment();
     const savedSettings = structuredClone(settings);
     const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
+    const savedPresets = structuredClone(presets); // #21
+    const savedPresetsRaw = Spicetify.LocalStorage.get(PRESETS_KEY);
     const rootStyle = document.documentElement.style;
     const savedButton = [rootStyle.getPropertyValue("--spice-button"), rootStyle.getPropertyPriority("--spice-button")];
     const restoreButton = () =>
@@ -2116,6 +2122,9 @@
       applyCss();
       if (savedRaw == null) Spicetify.LocalStorage.remove(STORAGE_KEY);
       else Spicetify.LocalStorage.set(STORAGE_KEY, savedRaw);
+      presets = savedPresets;
+      if (savedPresetsRaw == null) Spicetify.LocalStorage.remove(PRESETS_KEY);
+      else Spicetify.LocalStorage.set(PRESETS_KEY, savedPresetsRaw);
       selfTestRunning = false;
     }
 
@@ -3108,6 +3117,374 @@
     check(15, "The Gradient switch, Remove, the stepper's + and − and Duplicate disable/enable the row in place (mode kept)",
       gradientSteps.every((s) => s.endsWith(": ok")), gradientSteps.join("; "));
     stillOpen("gradient changes with the Spread row");
+
+    // ── Presets and share codes (#21) ──
+    // Store first: pure functions on crafted raw values, counting [gpb] warnings per load.
+    const gpbWarnings = (fn) => {
+      const original = console.warn;
+      let count = 0;
+      console.warn = (...args) => (String(args[0]).startsWith("[gpb]") ? count++ : original(...args));
+      try {
+        return [fn(), count];
+      } finally {
+        console.warn = original;
+      }
+    };
+    const presetsJson = (list) => JSON.stringify({ version: PRESETS_VERSION, presets: list });
+    const own = (id, name, s) => ({ id, name, settings: s });
+    const sampleA = { gradient: true, mode: "anchored", stops: [theme("s1"), custom("s2", RED)] };
+    const sampleB = { gradient: false, mode: "slide", stops: [custom("s1", BLUE)] };
+    const names = (list) => list.map((p) => p.name).join(", ");
+
+    presets = [own("p1", "One", sampleA), own("p2", "Two", sampleB)];
+    savePresets();
+    const [reloadedPresets, reloadWarnings] = gpbWarnings(() => loadPresets());
+    check(21, "Presets store: save → load round-trip in gpb:presets (theme and custom stops, gradient, mode); gpb:settings untouched",
+      JSON.stringify(reloadedPresets) === JSON.stringify(presets) && !reloadWarnings &&
+        JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY)).version === PRESETS_VERSION,
+      `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(PRESETS_KEY).length} characters`);
+    const [kept, dropWarnings] = gpbWarnings(() => loadPresets(presetsJson([
+      own("p1", "  Good  ", sampleA),
+      own("p2", "Bad hex", { ...sampleA, stops: [custom("s1", "#12345")] }),
+      own("p3", "   ", sampleB),
+      own("p4", "x".repeat(PRESET_NAME_MAX + 1), sampleB),
+      own("p5", "Bad mode", { ...sampleB, mode: "sideways" }),
+      { id: "p6", name: "No settings" },
+      own("p1", "Same id", sampleB),
+      own("p7", "good", sampleB),
+    ])));
+    check(21, "Invalid presets are dropped with one [gpb] warning; names trimmed; a name clash gets ' (2)'",
+      names(kept) === "Good, good (2)" && dropWarnings === 1, `kept ${names(kept)}; ${dropWarnings} warning(s)`);
+    const corrupt = ["{nope", JSON.stringify({ version: 2, presets: [] }), JSON.stringify([1, 2]), JSON.stringify({ version: 1 })]
+      .map((raw) => gpbWarnings(() => loadPresets(raw)));
+    check(21, "A corrupt or unknown gpb:presets gives an empty list and one warning",
+      corrupt.every(([list, warnings]) => list.length === 0 && warnings === 1),
+      corrupt.map(([list, warnings]) => `${list.length} presets/${warnings} warning(s)`).join(", "));
+    const [capped, capWarnings] = gpbWarnings(() =>
+      loadPresets(presetsJson(Array.from({ length: MAX_PRESETS + 2 }, (_, i) => own(`p${i + 1}`, `Mine ${i + 1}`, sampleB))))
+    );
+    presets = [own("p1", "Mine", sampleB)];
+    const clashes = [uniqueName("Mine"), uniqueName("ocean"), uniqueName(" Spaced "), uniqueName("y".repeat(30))];
+    presets = [own("p1", "y".repeat(PRESET_NAME_MAX), sampleB)];
+    const longClash = uniqueName("y".repeat(PRESET_NAME_MAX));
+    check(21, `At most ${MAX_PRESETS} presets load; names are unique (built-ins included, any case), trimmed and ≤ ${PRESET_NAME_MAX} characters`,
+      capped.length === MAX_PRESETS && capWarnings === 1 &&
+        clashes.join("|") === `Mine (2)|ocean (2)|Spaced|${"y".repeat(PRESET_NAME_MAX)}` &&
+        longClash.length === PRESET_NAME_MAX && longClash.endsWith(" (2)"),
+      `${capped.length} loaded, ${capWarnings} warning(s); ${clashes.join(" | ")} | ${longClash}`);
+    presets = [];
+    savePresets();
+    const builtInsBefore = BUILT_IN_PRESETS.map((p) => p.id).join();
+    check(21, "Built-ins can't be deleted, renamed or updated",
+      deletePreset("b:ocean") === null && !renamePreset("b:ocean", "Sea") && !updatePreset("b:ocean") &&
+        BUILT_IN_PRESETS.map((p) => p.id).join() === builtInsBefore && BUILT_IN_PRESETS[1].name === "Ocean",
+      builtInsBefore);
+
+    // Share codes: round-trip and rejection, all through validateSettings().
+    const codeCases = MODES.flatMap((mode) => [true, false].map((gradient) =>
+      ({ version: SCHEMA_VERSION, gradient, mode, stops: [theme("a"), custom("b", RED), custom("c", "#00ff7f")] })));
+    const roundTrips = codeCases.map((s) => {
+      const back = decodeCode(encodeCode(s));
+      return !!back && sameSettings(back, s) && back.stops.map((stop) => stop.id).join() === "s1,s2,s3";
+    });
+    const threeColours = encodeCode({ version: SCHEMA_VERSION, gradient: true, mode: "compress", stops: [custom("a", RED), custom("b", GREEN), custom("c", BLUE)] });
+    check(21, "Code round-trip: theme and custom stops, every mode, gradient on and off (ids s1…sN)",
+      roundTrips.every(Boolean) && threeColours.startsWith(CODE_PREFIX),
+      `${roundTrips.filter(Boolean).length}/${roundTrips.length}; three colours: ${threeColours} (${threeColours.length} characters)`);
+    const rawCode = (data) => CODE_PREFIX + btoa(JSON.stringify(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const validBody = threeColours.slice(CODE_PREFIX.length);
+    const invalidCodes = {
+      garbage: "garbage",
+      empty: "",
+      "wrong prefix": `gpb2:${validBody}`,
+      "prefix only": CODE_PREFIX,
+      "not base64": `${CODE_PREFIX}@@@`,
+      "9 stops": rawCode({ g: 1, m: "c", s: Array(9).fill("ff0000") }),
+      "bad hex": rawCode({ g: 1, m: "c", s: ["zzzzzz"] }),
+      "short hex": rawCode({ g: 1, m: "c", s: ["fff"] }),
+      "unknown mode": rawCode({ g: 1, m: "x", s: ["ff0000"] }),
+      "no mode": rawCode({ g: 1, s: ["ff0000"] }),
+      "g 2": rawCode({ g: 2, m: "c", s: ["ff0000"] }),
+    };
+    const accepted = Object.entries(invalidCodes).filter(([, code]) => decodeCode(code) !== null).map(([name]) => name);
+    check(21, "Invalid codes are rejected: garbage, a wrong prefix, 9 stops, a bad hex and more", !accepted.length,
+      accepted.length ? `accepted: ${accepted.join(", ")}` : `${Object.keys(invalidCodes).length} rejected`);
+    check(21, "Whitespace around a code is accepted", !!decodeCode(`  \n${threeColours}\t `), "");
+
+    // The Presets row in the open modal.
+    renderChips(m);
+    const chipIds = () => [...m.chips.querySelectorAll(".gpb-chip")].filter((el) => !el.hidden)
+      .map((el) => (el === m.saveChip ? "save" : el.dataset.preset)).join();
+    const chipOf = (id) => chipEl(id);
+    const pressed = () => [...m.chips.querySelectorAll('.gpb-preset-chip[aria-pressed="true"]')].map((el) => el.dataset.preset).join() || "none";
+    const undoState = () => `undo "${m.undoText.textContent}"${m.undoButton.hidden ? " (no button)" : " + Undo"}`;
+    const undoShows = (message) => m.undoText.textContent === `${message} · ` && !m.undoButton.hidden &&
+      m.undoLine.getAttribute("aria-live") === "polite";
+    const presetsRect = m.presets.getBoundingClientRect();
+    const toolsRect = m.presetsRow.querySelector(".gpb-presets-tools").getBoundingClientRect();
+    const labelRect = m.presetsRow.querySelector(".gpb-label").getBoundingClientRect();
+    const unreachableChips = [...m.chips.querySelectorAll(".gpb-chip"), m.copyButton, m.importButton].filter((el) => !reachable(el));
+    check(21, "Presets row between Spread and the preview: label left, Copy code and Import right, every chip reachable",
+      m.presets.previousElementSibling === m.spread && m.presets.nextElementSibling === m.preview &&
+        Math.abs(labelRect.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 &&
+        m.copyButton.textContent.startsWith(COPY_LABEL) && m.importButton.textContent === "Import" && !unreachableChips.length,
+      `after .${m.presets.previousElementSibling?.className}, before .${m.presets.nextElementSibling?.className}; ` +
+        `tools ${(presetsRect.right - toolsRect.right).toFixed(1)} px from the right` +
+        (unreachableChips.length ? `; not reachable: ${unreachableChips.map((el) => el.textContent).join(", ")}` : ""));
+    const chipSwatch = chipOf("b:aurora")?.querySelector(".gpb-chip-swatch");
+    const swatchRect = chipSwatch?.getBoundingClientRect();
+    const swatchProbe = document.createElement("span"); // the same serialisation as the chip's inline style
+    swatchProbe.style.backgroundImage = fillImage(presetSettings(BUILT_IN_PRESETS[2]));
+    check(21, "Chips: the built-ins first, then own presets, + Save last; 12 px swatches painted with fillImage()",
+      chipIds() === "b:sunset,b:ocean,b:aurora,b:neon,save" && swatchRect && Math.abs(swatchRect.width - 12) <= 0.5 &&
+        Math.abs(swatchRect.height - 12) <= 0.5 && getComputedStyle(chipSwatch).borderRadius === "50%" &&
+        chipSwatch.style.backgroundImage === swatchProbe.style.backgroundImage,
+      `${chipIds()}; swatch ${swatchRect?.width.toFixed(1)}×${swatchRect?.height.toFixed(1)}, ${chipSwatch?.style.backgroundImage}`);
+
+    // Two-step apply. Not a preset and not the defaults, so the first click only arms.
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
+    const notAPreset = JSON.stringify(settings);
+    const ocean = chipOf("b:ocean");
+    const oceanLabel = () => ocean.querySelector(".gpb-chip-label").textContent;
+    const idleChipWidth = ocean.getBoundingClientRect().width;
+    realClick(ocean);
+    const armedChipWidth = ocean.getBoundingClientRect().width;
+    check(21, "First click on a chip arms it ('Apply?', --spice-button border, width ±1 px) without changing the settings",
+      ocean.classList.contains("gpb-armed") && oceanLabel() === APPLY_LABEL && JSON.stringify(settings) === notAPreset &&
+        Math.abs(armedChipWidth - idleChipWidth) <= 1,
+      `label "${oceanLabel()}", width ${idleChipWidth.toFixed(1)} → ${armedChipWidth.toFixed(1)} px`);
+    stillOpen("arming a preset chip");
+    press(ocean, "Escape");
+    check(21, "Escape disarms the chip without applying", !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" &&
+      JSON.stringify(settings) === notAPreset, `label "${oceanLabel()}"`);
+    stillOpen("Escape on an armed chip");
+    realClick(ocean);
+    await sleep(RESET_CONFIRM_MS + 200);
+    check(21, `An armed chip disarms after ${RESET_CONFIRM_MS / 1000} s without applying`,
+      !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" && JSON.stringify(settings) === notAPreset, `label "${oceanLabel()}"`);
+    realClick(ocean);
+    realClick(dots()[0]);
+    check(21, "Clicking elsewhere disarms the chip", !ocean.classList.contains("gpb-armed") && JSON.stringify(settings) === notAPreset,
+      `label "${oceanLabel()}"`);
+    selectStop("s2");
+    realClick(ocean);
+    realClick(ocean);
+    const appliedOpen = m.root.isConnected && modal === m;
+    check(21, "Second click applies Ocean: its colours, gradient on, the mode kept (Anchored), the first dot selected; same chip node",
+      appliedOpen && sameSettings(settings, presetSettings(BUILT_IN_PRESETS[1])) && settings.mode === "anchored" &&
+        selectionIs(settings.stops[0].id) && chipOf("b:ocean") === ocean && ocean.isConnected,
+      `${settings.mode}, ${settings.stops.map((s) => s.color).join(", ")}; ${selection()}`);
+    stillOpen("applying a preset");
+    const buttonColour = computedRgb(m.root, "var(--spice-button)");
+    const oceanBorder = parseRgb(getComputedStyle(ocean).borderTopColor);
+    check(21, "The active chip is marked: aria-pressed on Ocean only, with a --spice-button border",
+      pressed() === "b:ocean" && !!oceanBorder && !!buttonColour && oceanBorder.slice(0, 3).every((v, i) => Math.abs(v - buttonColour[i]) <= 1),
+      `pressed ${pressed()}, border ${getComputedStyle(ocean).borderTopColor}`);
+    check(21, "Undo line after applying: 'Applied \"Ocean\" · Undo' in a polite live region", undoShows('Applied "Ocean"'), undoState());
+
+    const sunset = chipOf("b:sunset");
+    realClick(sunset);
+    check(21, "One click applies when nothing would be lost (the current settings are a preset)",
+      sameSettings(settings, presetSettings(BUILT_IN_PRESETS[0])) && !sunset.classList.contains("gpb-armed") && pressed() === "b:sunset",
+      `pressed ${pressed()}, ${undoState()}`);
+    const oceanState = presetSettings(BUILT_IN_PRESETS[1]);
+    realClick(m.undoButton);
+    check(21, "A new action replaces the pending undo: Undo goes back to Ocean, not further",
+      sameSettings(settings, oceanState) && selectionIs(settings.stops[0].id) && m.undoButton.hidden && !m.undoText.textContent,
+      `${settings.stops.map((s) => s.color).join(", ")}; ${undoState()}`);
+    stillOpen("Undo after applying");
+
+    setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s3", GREEN)], "slide");
+    selectStop("s3");
+    const exact = JSON.stringify(settings);
+    realClick(ocean);
+    realClick(ocean);
+    realClick(m.undoButton);
+    check(21, "Undo after applying restores exactly the previous settings (ids included), the selection on the first dot",
+      JSON.stringify(settings) === exact && selectedId === "s1" && selectionIs("s1"), `${JSON.stringify(settings)}; ${selection()}`);
+    stillOpen("Undo after applying");
+    setTestSettings(false, [theme("s1")]);
+    realClick(chipOf("b:neon"));
+    check(21, "One click applies when the current settings are the defaults",
+      sameSettings(settings, presetSettings(BUILT_IN_PRESETS[3])) && pressed() === "b:neon", `pressed ${pressed()}`);
+    setStopColour(settings.stops[0].id, BLUE);
+    check(21, "Editing the colours afterwards drops the pending undo, so it never throws away later edits",
+      m.undoButton.hidden && !pendingUndo, undoState());
+    realClick(chipOf("b:neon"));
+    realClick(chipOf("b:neon"));
+    await sleep(UNDO_MS + 200);
+    check(21, `Undo expires after ${UNDO_MS / 1000} s`, m.undoButton.hidden && !m.undoText.textContent && !pendingUndo, undoState());
+
+    // + Save, the inline name field, own presets.
+    setTestSettings(true, [theme("s1"), custom("s2", RED)], "slide");
+    const saveNode = m.saveChip;
+    realClick(saveNode);
+    const nameShown = !m.nameField.hidden && m.saveChip.hidden && document.activeElement === m.nameField && m.nameField.value === "Preset 1" &&
+      m.nameField.tagName === "INPUT" && !m.nameField.closest(".gpb-popover") && saveNode.isConnected;
+    check(21, "+ Save turns into an inline name field (not a popover), prefilled 'Preset 1' and focused",
+      nameShown, `field hidden ${m.nameField.hidden}, value "${m.nameField.value}", focus .${document.activeElement?.className}`);
+    stillOpen("+ Save");
+    press(m.nameField, "Escape");
+    check(21, "Escape in the name field cancels: nothing saved, + Save back and focused",
+      !presets.length && m.nameField.hidden && !m.saveChip.hidden && document.activeElement === m.saveChip,
+      `${presets.length} presets, focus .${document.activeElement?.className}`);
+    stillOpen("Escape in the name field");
+    realClick(m.saveChip);
+    m.nameField.value = "  Mine  ";
+    press(m.nameField, "Enter");
+    await tick();
+    await tick();
+    const mineId = presets[0]?.id;
+    const mineChip = mineId && chipOf(mineId);
+    const storedPresets = JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY) ?? "{}").presets ?? [];
+    check(21, "Enter saves the current settings as 'Mine' (stored), its chip appears after the built-ins, active and focused",
+      presets.length === 1 && presets[0].name === "Mine" && sameSettings(presetSettings(presets[0]), settings) &&
+        storedPresets[0]?.name === "Mine" && chipIds() === `b:sunset,b:ocean,b:aurora,b:neon,${mineId},save` &&
+        mineChip?.getAttribute("aria-pressed") === "true" && document.activeElement === mineChip && m.saveChip === saveNode,
+      `${chipIds()}; pressed ${pressed()}; focus ${document.activeElement?.dataset?.preset ?? document.activeElement?.className}`);
+    stillOpen("saving a preset");
+
+    setTestSettings(true, [custom("s1", GREEN), custom("s2", BLUE)], "compress");
+    realClick(chipOf(mineId));
+    realClick(chipOf(mineId));
+    check(21, "An own preset restores everything: gradient, mode (Slide) and stops, theme stops stay theme",
+      sameSettings(settings, { gradient: true, mode: "slide", stops: [theme("x"), custom("y", RED)] }), JSON.stringify(settings));
+    stillOpen("applying an own preset");
+
+    rightClick(chipOf("b:ocean"));
+    const builtInMenu = menuShown();
+    closePopover();
+    rightClick(chipOf(mineId));
+    const shownItems = [...m.menu.querySelectorAll(".gpb-menu-item")].filter((el) => !el.hidden).map((el) => el.textContent);
+    check(21, "Right-click on an own chip opens the existing menu inside the modal root: Rename, Update to current colours, Delete; built-ins have none",
+      !builtInMenu && menuShown() && m.root.contains(m.menu) && popover?.anchor === chipOf(mineId) &&
+        shownItems.join() === "Rename,Update to current colours,Delete" && m.menu.getAttribute("aria-label") === "Preset actions",
+      `built-in menu ${builtInMenu}; items ${shownItems.join(", ")}`);
+    const renameNode = m.renameItem;
+    realClick(renameNode);
+    const renaming = !m.nameField.hidden && m.nameField.value === "Mine" && chipOf(mineId)?.hidden &&
+      m.nameField.nextElementSibling === chipOf(mineId) && renameNode.isConnected && !menuShown();
+    m.nameField.value = "Ocean";
+    press(m.nameField, "Enter");
+    await tick();
+    await tick();
+    check(21, "Rename: an inline field in the chip's place; a clash with a built-in gets ' (2)'; the menu item stays connected",
+      renaming && presets[0].name === "Ocean (2)" && chipOf(mineId)?.textContent.includes("Ocean (2)") && !chipOf(mineId)?.hidden,
+      `field shown in place ${renaming}; name "${presets[0].name}"`);
+    stillOpen("renaming a preset");
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)], "compress");
+    rightClick(chipOf(mineId));
+    realClick(m.updatePresetItem);
+    await tick();
+    await tick();
+    check(21, "Update to current colours stores the current settings in the preset; its chip turns active",
+      sameSettings(presetSettings(presets[0]), settings) && chipOf(mineId)?.getAttribute("aria-pressed") === "true",
+      `pressed ${pressed()}`);
+    stillOpen("updating a preset");
+
+    chipOf(mineId).focus();
+    press(chipOf(mineId), "F10", { shiftKey: true });
+    const keyboardMenu = menuShown() && document.activeElement === m.renameItem;
+    press(document.activeElement, "Escape");
+    check(21, "Keyboard: Shift+F10 on an own chip opens the menu on Rename; Escape closes it and refocuses the chip",
+      keyboardMenu && !menuShown() && document.activeElement === chipOf(mineId),
+      `menu ${keyboardMenu}, focus ${document.activeElement?.dataset?.preset ?? document.activeElement?.className}`);
+    stillOpen("Escape in the chip menu");
+
+    addPreset("Second");
+    renderChips(m);
+    const beforeDelete = JSON.stringify(presets);
+    rightClick(chipOf(mineId));
+    const deleteNode = m.deletePresetItem;
+    realClick(deleteNode);
+    await tick();
+    await tick();
+    check(21, "Delete removes the preset at once (storage too); 'Deleted \"Ocean (2)\" · Undo'; the menu item stays connected",
+      presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(PRESETS_KEY).includes('"Ocean (2)"') &&
+        undoShows('Deleted "Ocean (2)"') && deleteNode.isConnected,
+      `${names(presets)}; ${undoState()}`);
+    stillOpen("deleting a preset");
+    realClick(m.undoButton);
+    await tick();
+    await tick();
+    check(21, "Undo after Delete restores the preset in its old place, in storage too",
+      JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(PRESETS_KEY) === presetsJson(JSON.parse(beforeDelete)) &&
+        chipIds().startsWith(`b:sunset,b:ocean,b:aurora,b:neon,${mineId},`),
+      `${names(presets)}; ${chipIds()}`);
+    stillOpen("Undo after deleting");
+
+    while (presets.length < MAX_PRESETS) addPreset("Fill");
+    renderChips(m);
+    check(21, `+ Save is disabled at ${MAX_PRESETS} presets with the title 'Up to ${MAX_PRESETS} presets'; a ${MAX_PRESETS + 1}th isn't added`,
+      m.saveChip.disabled && m.saveChip.title === SAVE_FULL_LABEL && addPreset("One more") === null && presets.length === MAX_PRESETS,
+      `${presets.length} presets, disabled ${m.saveChip.disabled}, title "${m.saveChip.title}"`);
+    presets = [];
+    savePresets();
+    renderChips(m);
+
+    // Import: an inline paste field; nothing changes on an invalid code.
+    setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
+    const beforeImport = JSON.stringify(settings);
+    realClick(m.importButton);
+    const importOpen = !m.importPanel.hidden && m.importButton.getAttribute("aria-expanded") === "true" && document.activeElement === m.codeInput;
+    m.codeInput.value = "gpb1:not-a-code";
+    const applyNode = m.importApply;
+    realClick(applyNode);
+    check(21, "Import: an invalid code is flagged (aria-invalid, 'Not a valid code') and changes nothing",
+      importOpen && m.codeInput.getAttribute("aria-invalid") === "true" && m.importError.textContent === IMPORT_ERROR &&
+        JSON.stringify(settings) === beforeImport,
+      `panel open ${importOpen}, aria-invalid ${m.codeInput.getAttribute("aria-invalid")}, error "${m.importError.textContent}"`);
+    stillOpen("an invalid import");
+    const shared = { version: SCHEMA_VERSION, gradient: true, mode: "slide", stops: [theme("x"), custom("y", BLUE)] };
+    m.codeInput.value = `  ${encodeCode(shared)}  `;
+    m.codeInput.dispatchEvent(new Event("input", { bubbles: true }));
+    const errorCleared = !m.codeInput.hasAttribute("aria-invalid") && !m.importError.textContent;
+    realClick(applyNode);
+    check(21, "Import: a valid code applies at once (no arming), the field closes, 'Imported code · Undo'; Apply stays connected",
+      errorCleared && sameSettings(settings, shared) && m.importPanel.hidden && undoShows("Imported code") && applyNode.isConnected,
+      `${JSON.stringify(settings)}; ${undoState()}`);
+    stillOpen("importing a code");
+    realClick(m.undoButton);
+    check(21, "Undo after Import restores exactly", JSON.stringify(settings) === beforeImport, JSON.stringify(settings));
+    stillOpen("Undo after importing");
+
+    // Copy code: a stubbed clipboard, a failing one, then the real one.
+    const clipboard = navigator.clipboard;
+    const ownWrite = clipboard && Object.prototype.hasOwnProperty.call(clipboard, "writeText");
+    const copyWidth = m.copyButton.getBoundingClientRect().width;
+    let captured = null;
+    try {
+      if (clipboard) {
+        clipboard.writeText = async (text) => void (captured = text);
+        const copied = await copyCode(m);
+        check(21, "Copy code writes gpb1:… of the current settings to the clipboard; 'Copied' (live region, width kept)",
+          copied && captured === encodeCode(settings) && m.copyLabel.textContent === COPIED_LABEL &&
+            m.copyLabel.getAttribute("aria-live") === "polite" && Math.abs(m.copyButton.getBoundingClientRect().width - copyWidth) <= 1,
+          `${captured}; label "${m.copyLabel.textContent}"`);
+        await sleep(COPIED_MS + 200);
+        check(21, `'Copied' goes back to 'Copy code' after ${COPIED_MS / 1000} s`, m.copyLabel.textContent === COPY_LABEL, m.copyLabel.textContent);
+      }
+      if (clipboard) clipboard.writeText = () => Promise.reject(new Error("denied"));
+      const copyNode = m.copyButton;
+      realClick(copyNode);
+      await sleep(50);
+      const out = m.codeOutput;
+      check(21, "If the clipboard fails, the code shows in a read-only field, selected",
+        !out.hidden && out.readOnly && out.value === encodeCode(settings) && document.activeElement === out &&
+          out.selectionStart === 0 && out.selectionEnd === out.value.length && copyNode.isConnected,
+        `shown ${!out.hidden}, value ${out.value}, selected ${out.selectionStart}–${out.selectionEnd}`);
+      stillOpen("Copy code");
+    } finally {
+      if (clipboard && !ownWrite) delete clipboard.writeText;
+    }
+    if (clipboard) {
+      const reached = await copyCode(m);
+      check(21, "Copy code with the real clipboard: copied, or the fallback field appears",
+        reached ? m.copyLabel.textContent === COPIED_LABEL : !m.codeOutput.hidden,
+        reached ? "copied" : "clipboard refused; fallback field shown");
+    }
+    m.codeOutput.hidden = true;
+    stillOpen("the Presets row");
 
     realClick(resetBtn);
     realClick(resetBtn);
