@@ -2,6 +2,14 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.6.1 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#53](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/53) | New built-in presets (Void, Sunset, Aurora, Neon, Fairy) in their own row | ui, enhancement | ⏳ |
+| [#54](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/54) | Export copies straight to the clipboard; the button shows "Copied" | bug, ui, compatibility | ⏳ |
+| [#55](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/55) | Spotify 1.3.5.3058 re-verified; Topbar and profile menu work again | compatibility, documentation | ⏳ |
+
 ## v1.6.0 — released 2026-10-18
 
 | # | Issue | Area | Status |
@@ -124,7 +132,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-Nothing is planned after v1.6.0 yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
+v1.6.1 (#53, #54, #55) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
 
 ## Future
 
