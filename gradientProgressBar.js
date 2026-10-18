@@ -584,6 +584,9 @@
 .gpb-button:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-button:disabled { opacity: .5; cursor: not-allowed; }
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+.gpb-share-button { display: inline-flex; align-items: center; align-self: center; gap: 6px; padding: 4px 12px 4px 10px; font-size: .8125rem; }
+.gpb-share-button > svg { flex: none; }
+.gpb-share-button[aria-expanded="true"] { border-color: var(--spice-text); }
 .gpb-actions { display: flex; justify-content: center; align-items: center; }
 .gpb-actions > .gpb-button { align-self: center; }
 .gpb-reset { display: inline-grid; justify-items: center; }
@@ -640,8 +643,8 @@
 .gpb-chip-text > span { grid-area: 1 / 1; white-space: nowrap; }
 .gpb-name-field { flex: none; width: 18ch; height: 28px; padding: 0 12px; border-radius: 500px; text-align: left; }
 .gpb-undo { font-size: .8125rem; color: var(--spice-subtext); }
-.gpb-presets-tools { display: flex; gap: 4px; }
-.gpb-text-button[aria-expanded="true"] { color: var(--spice-text); }
+.gpb-presets-tools { display: flex; align-items: center; gap: 8px; }
+.gpb-copied { font-size: .8125rem; color: var(--spice-subtext); }
 .gpb-code-output, .gpb-code-input { font-family: ui-monospace, Consolas, monospace; font-size: .8125rem; text-align: left; }
 .gpb-import-row { display: flex; align-items: center; gap: 8px; }
 .gpb-import-row > .gpb-code-input { flex: 1; }
@@ -663,9 +666,11 @@
   const SPREAD_OFF_HINT = "Applies when the gradient is on.";
 
   const REORDER_HINT = "Drag or Alt+←/→ to reorder"; // second line of the dot tooltip (#24)
-  const HELP_TEXT =
-    "Click a colour to edit it, drag to reorder, right-click to duplicate. + adds a colour, − removes the selected one.";
-  const HELP_RESET = "Reset goes back to a single colour that follows your theme."; // the help's second line (#47)
+  const HELP_LINES = [ // one line each, joined with <br> (#47, #49, #52)
+    "Click a colour to edit it, drag to reorder, right-click to duplicate.",
+    "+ adds a colour, − removes the selected one.",
+    "Reset goes back to a single colour that follows your theme.",
+  ];
   const ADD_LABEL = "Add colour";
   const ADD_FULL_LABEL = `Up to ${MAX_STOPS} colours`;
   const REMOVE_LABEL = "Remove selected colour"; // the stepper's − (#49)
@@ -674,6 +679,11 @@
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2 7.25h12v1.5H2z"/></svg>';
   const PLUS_ICON =
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 2h1.5v5.25H14v1.5H8.75V14h-1.5V8.75H2v-1.5h5.25z"/></svg>';
+
+  const EXPORT_ICON = // arrow up out of a tray (#52)
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 1.5 4.5 5h2.75v5.5h1.5V5h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
+  const IMPORT_ICON = // arrow down into a tray (#52)
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5h1.5V7h2.75L8 10.5 4.5 7h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
 
   const EYEDROPPER_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.35 2.65a2 2 0 0 0-2.83 0L8.9 4.27l-.7-.71-1.06 1.06.7.71-5.3 5.3a1.5 1.5 0 0 0-.44 1.07L2 14l2.3-.1a1.5 1.5 0 0 0 1.07-.44l5.3-5.3.71.7 1.06-1.06-.7-.71 1.61-1.61a2 2 0 0 0 0-2.83zM4.3 12.4l-.8.04.04-.8 5.37-5.37.76.76z"/></svg>';
@@ -717,8 +727,9 @@
         <div class="gpb-presets-row">
           <span class="gpb-label" id="gpb-presets-label">Presets</span>
           <div class="gpb-presets-tools">
-            <button type="button" class="gpb-text-button gpb-copy-code"><span class="gpb-copy-label" aria-live="polite">${COPY_LABEL}</span><span class="gpb-sizer" aria-hidden="true">${COPY_LABEL}</span><span class="gpb-sizer" aria-hidden="true">${COPIED_LABEL}</span></button>
-            <button type="button" class="gpb-text-button gpb-import" aria-expanded="false" aria-controls="gpb-import-panel">Import</button>
+            <span class="gpb-copied" aria-live="polite"></span>
+            <button type="button" class="gpb-button gpb-share-button gpb-export" title="${EXPORT_TITLE}">${EXPORT_ICON}<span>Export</span></button>
+            <button type="button" class="gpb-button gpb-share-button gpb-import" title="${IMPORT_TITLE}" aria-expanded="false" aria-controls="gpb-import-panel">${IMPORT_ICON}<span>Import</span></button>
           </div>
         </div>
         <div class="gpb-chips" role="group" aria-labelledby="gpb-presets-label">
@@ -763,7 +774,7 @@
       <div class="gpb-actions">
         <button type="button" class="gpb-button gpb-reset"><span class="gpb-reset-label" aria-live="polite">Reset</span><span class="gpb-reset-sizer" aria-hidden="true">${RESET_CONFIRM_LABEL}</span></button>
       </div>
-      <p class="gpb-help">${HELP_TEXT}<br>${HELP_RESET}</p>`;
+      <p class="gpb-help">${HELP_LINES.join("<br>")}</p>`;
 
     const m = {
       root,
@@ -778,8 +789,8 @@
       chips: root.querySelector(".gpb-chips"),
       saveChip: root.querySelector(".gpb-save-chip"),
       nameField: root.querySelector(".gpb-name-field"),
-      copyButton: root.querySelector(".gpb-copy-code"),
-      copyLabel: root.querySelector(".gpb-copy-label"),
+      exportButton: root.querySelector(".gpb-export"),
+      copiedNote: root.querySelector(".gpb-copied"),
       importButton: root.querySelector(".gpb-import"),
       codeOutput: root.querySelector(".gpb-code-output"),
       importPanel: root.querySelector(".gpb-import-panel"),
@@ -1079,20 +1090,21 @@
   }
 
   // ── Sharing (#21) ──
-  // Copy code puts a gpb1: code on the clipboard; if that fails, the code shows in a selected
+  // Export puts a gpb1: code on the clipboard; if that fails, the code shows in a selected
   // read-only field instead. Import is an inline paste field, never navigator.clipboard.readText()
   // (that asks for a permission). While the field holds a valid code the strip previews it; Apply
   // is the deliberate step, with Undo (#51).
 
-  const COPY_LABEL = "Copy code";
-  const COPIED_LABEL = "Copied";
+  const EXPORT_TITLE = "Copy a share code to the clipboard";
+  const IMPORT_TITLE = "Paste a share code";
+  const COPIED_LABEL = "Copied"; // next to Export, so the button's label and width never change (#52)
   const COPIED_MS = 2000;
   const CLIPBOARD_TIMEOUT_MS = 1500; // a clipboard write that never settles counts as failed
   const IMPORT_ERROR = "Not a valid code";
   const PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
 
   function enableSharing(m) {
-    m.copyButton.addEventListener("click", () => copyCode(m));
+    m.exportButton.addEventListener("click", () => copyCode(m));
     m.codeOutput.addEventListener("blur", () => (m.codeOutput.hidden = true));
     m.importButton.addEventListener("click", () => toggleImport(m));
     m.importApply.addEventListener("click", () => importCode(m));
@@ -1133,9 +1145,9 @@
     }
     if (modal !== m) return true;
     m.codeOutput.hidden = true;
-    m.copyLabel.textContent = COPIED_LABEL; // in place; the sizers keep the width
+    m.copiedNote.textContent = COPIED_LABEL;
     clearTimeout(m.copiedTimer);
-    m.copiedTimer = setTimeout(() => (m.copyLabel.textContent = COPY_LABEL), COPIED_MS);
+    m.copiedTimer = setTimeout(() => (m.copiedNote.textContent = ""), COPIED_MS);
     return true;
   }
 
@@ -2469,8 +2481,10 @@
     check(3, "No id=color-input of ours (Hazy looks it up)", !colorInput || !m.root.contains(colorInput),
       colorInput ? "exists, but it's not ours" : "none in the document");
     const help = m.help;
-    check(37, "Help text is the last element of the modal content, after the action row, with both lines (#47)",
-      help.textContent === HELP_TEXT + HELP_RESET && help.querySelectorAll("br").length === 1 && m.root.lastElementChild === help &&
+    const helpLines = help.innerHTML.split(/<br\s*\/?>/).map((line) => line.trim());
+    check(52, "Help text is the last element of the modal content, after the action row, in three lines in order",
+      helpLines.length === HELP_LINES.length && helpLines.every((line, i) => line === HELP_LINES[i]) &&
+        help.querySelectorAll("br").length === 2 && m.root.lastElementChild === help &&
         m.actions.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING && !m.root.querySelector(".gpb-footer"),
       `last child .${m.root.lastElementChild?.className}, text "${help.innerText ?? help.textContent}"`);
     check(47, "No + Add colour button left; Reset alone in the action row",
@@ -3249,14 +3263,37 @@
     const presetsRect = m.presets.getBoundingClientRect();
     const toolsRect = m.presetsRow.querySelector(".gpb-presets-tools").getBoundingClientRect();
     const labelRect = m.presetsRow.querySelector(".gpb-label").getBoundingClientRect();
-    const unreachableChips = [...m.chips.querySelectorAll(".gpb-chip"), m.copyButton, m.importButton].filter((el) => !reachable(el));
-    check(21, "Presets row between Spread and the preview: label left, Copy code and Import right, every chip reachable",
+    const unreachableChips = [...m.chips.querySelectorAll(".gpb-chip"), m.exportButton, m.importButton].filter((el) => !reachable(el));
+    check(21, "Presets row between Spread and the preview: label left, Export and Import right, every chip reachable",
       m.presets.previousElementSibling === m.spread && m.presets.nextElementSibling === m.preview &&
-        Math.abs(labelRect.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 &&
-        m.copyButton.textContent.startsWith(COPY_LABEL) && m.importButton.textContent === "Import" && !unreachableChips.length,
+        Math.abs(labelRect.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
       `after .${m.presets.previousElementSibling?.className}, before .${m.presets.nextElementSibling?.className}; ` +
         `tools ${(presetsRect.right - toolsRect.right).toFixed(1)} px from the right` +
         (unreachableChips.length ? `; not reachable: ${unreachableChips.map((el) => el.textContent).join(", ")}` : ""));
+    // Export and Import look like buttons (#52): an outline, an icon, a bold label; hover read through CSSOM (#50).
+    const shareButtons = [[m.exportButton, "Export", EXPORT_TITLE], [m.importButton, "Import", IMPORT_TITLE]];
+    const shareProblems = shareButtons.flatMap(([el, label, title]) => {
+      const cs = getComputedStyle(el);
+      const border = parseRgb(cs.borderTopColor);
+      const svg = el.querySelector("svg");
+      const problems = [];
+      if (!(parseFloat(cs.borderTopWidth) >= 1) || cs.borderTopStyle !== "solid" || !border || border[3] === 0) problems.push(`${label}: border ${cs.borderTopWidth} ${cs.borderTopStyle} ${cs.borderTopColor}`);
+      if (!svg || el.firstElementChild !== svg || Math.abs(svg.getBoundingClientRect().width - 14) > 0.5) problems.push(`${label}: icon ${svg ? svg.getBoundingClientRect().width.toFixed(1) + " px" : "missing"}`);
+      if (el.textContent.trim() !== label || el.title !== title) problems.push(`${label}: text "${el.textContent.trim()}", title "${el.title}"`);
+      if (parseInt(cs.fontWeight, 10) < 700 || cs.borderTopLeftRadius === "0px") problems.push(`${label}: weight ${cs.fontWeight}, radius ${cs.borderTopLeftRadius}`);
+      return problems;
+    });
+    const copyCodeLeft = [...m.root.querySelectorAll("*")].filter((el) => el.childElementCount === 0 && /copy code/i.test(el.textContent));
+    check(52, "Export and Import are outlined pills with a 14 px icon first, bold labels 'Export' / 'Import' and their titles; no 'Copy code' left",
+      !shareProblems.length && !copyCodeLeft.length,
+      [...shareProblems, ...copyCodeLeft.map((el) => `"Copy code" in .${el.className}`)].join("; ") || "both fine");
+    const shareRules = [...(m.root.querySelector("style")?.sheet?.cssRules ?? [])].filter((r) => r.selectorText);
+    const shareHover = shareRules.find((r) => r.selectorText.split(",").some((sel) => sel.trim() === ".gpb-button:hover:not(:disabled)") &&
+      r.style.getPropertyValue("border-color").trim() === "var(--spice-text)");
+    const shareOverride = shareRules.find((r) => /\.gpb-share-button/.test(r.selectorText) && /:hover/.test(r.selectorText));
+    check(52, "Hover on Export / Import: the border → --spice-text, as for Reset (read through CSSOM)",
+      !!shareHover && !shareOverride && m.exportButton.matches(".gpb-button") && m.importButton.matches(".gpb-button"),
+      shareHover ? `"${shareHover.cssText}"` : "no .gpb-button:hover:not(:disabled) rule with border-color var(--spice-text)");
     const chipSwatch = chipOf("b:aurora")?.querySelector(".gpb-chip-swatch");
     const swatchRect = chipSwatch?.getBoundingClientRect();
     const swatchProbe = document.createElement("span"); // the same serialisation as the chip's inline style
@@ -3530,24 +3567,25 @@
     check(21, "Undo after Import restores exactly", JSON.stringify(settings) === beforeImport, JSON.stringify(settings));
     stillOpen("Undo after importing");
 
-    // Copy code: a stubbed clipboard, a failing one, then the real one.
+    // Export: a stubbed clipboard, a failing one, then the real one.
     const clipboard = navigator.clipboard;
     const ownWrite = clipboard && Object.prototype.hasOwnProperty.call(clipboard, "writeText");
-    const copyWidth = m.copyButton.getBoundingClientRect().width;
+    const exportWidth = m.exportButton.getBoundingClientRect().width;
     let captured = null;
     try {
       if (clipboard) {
         clipboard.writeText = async (text) => void (captured = text);
         const copied = await copyCode(m);
-        check(21, "Copy code writes gpb1:… of the current settings to the clipboard; 'Copied' (live region, width kept)",
-          copied && captured === encodeCode(settings) && m.copyLabel.textContent === COPIED_LABEL &&
-            m.copyLabel.getAttribute("aria-live") === "polite" && Math.abs(m.copyButton.getBoundingClientRect().width - copyWidth) <= 1,
-          `${captured}; label "${m.copyLabel.textContent}"`);
+        check(21, "Export writes gpb1:… of the current settings to the clipboard; 'Copied' beside it (live region); the button's label and width unchanged",
+          copied && captured === encodeCode(settings) && m.copiedNote.textContent === COPIED_LABEL &&
+            m.copiedNote.getAttribute("aria-live") === "polite" && m.exportButton.textContent.trim() === "Export" &&
+            Math.abs(m.exportButton.getBoundingClientRect().width - exportWidth) <= 1,
+          `${captured}; note "${m.copiedNote.textContent}", button "${m.exportButton.textContent.trim()}"`);
         await sleep(COPIED_MS + 200);
-        check(21, `'Copied' goes back to 'Copy code' after ${COPIED_MS / 1000} s`, m.copyLabel.textContent === COPY_LABEL, m.copyLabel.textContent);
+        check(21, `'Copied' disappears after ${COPIED_MS / 1000} s`, !m.copiedNote.textContent, m.copiedNote.textContent);
       }
       if (clipboard) clipboard.writeText = () => Promise.reject(new Error("denied"));
-      const copyNode = m.copyButton;
+      const copyNode = m.exportButton;
       realClick(copyNode);
       await sleep(50);
       const out = m.codeOutput;
@@ -3555,14 +3593,14 @@
         !out.hidden && out.readOnly && out.value === encodeCode(settings) && document.activeElement === out &&
           out.selectionStart === 0 && out.selectionEnd === out.value.length && copyNode.isConnected,
         `shown ${!out.hidden}, value ${out.value}, selected ${out.selectionStart}–${out.selectionEnd}`);
-      stillOpen("Copy code");
+      stillOpen("Export");
     } finally {
       if (clipboard && !ownWrite) delete clipboard.writeText;
     }
     if (clipboard) {
       const reached = await copyCode(m);
-      check(21, "Copy code with the real clipboard: copied, or the fallback field appears",
-        reached ? m.copyLabel.textContent === COPIED_LABEL : !m.codeOutput.hidden,
+      check(21, "Export with the real clipboard: copied, or the fallback field appears",
+        reached ? m.copiedNote.textContent === COPIED_LABEL : !m.codeOutput.hidden,
         reached ? "copied" : "clipboard refused; fallback field shown");
     }
     m.codeOutput.hidden = true;

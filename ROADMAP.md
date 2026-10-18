@@ -7,7 +7,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 | # | Issue | Area | Status |
 |---|---|---|---|
 | [#51](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/51) | Presets: first click previews in the strip, second click applies (always two-step) | ui, enhancement | ✅ |
-| [#52](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/52) | Export / Import as outlined buttons with icons; help text on three lines | ui | ⏳ |
+| [#52](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/52) | Export / Import as outlined buttons with icons; help text on three lines | ui | ✅ |
 
 ## v1.5.0 — released 2026-10-18
 
