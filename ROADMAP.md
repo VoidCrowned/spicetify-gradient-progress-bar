@@ -7,6 +7,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 | # | Issue | Area | Status |
 |---|---|---|---|
 | [#51](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/51) | Presets: first click previews in the strip, second click applies (always two-step) | ui, enhancement | ⏳ |
+| [#52](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/52) | Export / Import as outlined buttons with icons; help text on three lines | ui | ⏳ |
 
 ## v1.5.0 — released 2026-10-18
 
@@ -123,7 +124,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-v1.6.0 (#51) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
+v1.6.0 (#51, #52) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
 
 ## Future
 
