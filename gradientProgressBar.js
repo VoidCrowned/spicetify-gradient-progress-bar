@@ -136,6 +136,192 @@
     Spicetify.LocalStorage.set(STORAGE_KEY, JSON.stringify(settings));
   }
 
+  // ── Presets and share codes (#21) ───────────────────────────────────────────
+  // Own presets live in their own key with their own version, so gpb:settings (schema v1)
+  // never changes. Every stored preset and every imported code goes through validateSettings().
+
+  const PRESETS_KEY = "gpb:presets";
+  const PRESETS_VERSION = 1;
+  const MAX_PRESETS = 12;
+  const PRESET_NAME_MAX = 24;
+  const CODE_PREFIX = "gpb1:"; // the code's format version; a future schema bumps it
+  const MODE_CODES = { compress: "c", anchored: "a", slide: "s" };
+
+  // Colours only: applying one keeps the current Spread mode. They can't be renamed or deleted.
+  const BUILT_IN_PRESETS = [
+    { id: "b:sunset", name: "Sunset", colours: ["#ff5f6d", "#ffc371"] },
+    { id: "b:ocean", name: "Ocean", colours: ["#2193b0", "#6dd5ed"] },
+    { id: "b:aurora", name: "Aurora", colours: ["#00f5a0", "#00d9f5", "#7f5af0"] },
+    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff"] },
+  ].map((preset) => ({ ...preset, builtIn: true }));
+
+  let presets = []; // own presets: [{ id, name, settings: { gradient, mode, stops } }]
+
+  // What a preset stores: the settings without the schema version.
+  function snapshot(s) {
+    return { gradient: s.gradient, mode: s.mode, stops: s.stops.map((stop) => ({ ...stop })) };
+  }
+
+  // The settings a preset applies. A built-in keeps the current mode.
+  function presetSettings(preset, current = settings) {
+    if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings) };
+    const stops = preset.colours.map((color, i) => ({ id: `s${i + 1}`, kind: "custom", color }));
+    return { version: SCHEMA_VERSION, gradient: true, mode: current.mode, stops };
+  }
+
+  // Equal settings, ignoring stop ids. Built-ins therefore compare colours only (their mode is
+  // the current one).
+  function sameSettings(a, b) {
+    return a.gradient === b.gradient && a.mode === b.mode && a.stops.length === b.stops.length &&
+      a.stops.every((stop, i) => stop.kind === b.stops[i].kind && stop.color === b.stops[i].color);
+  }
+
+  const matchesPreset = (preset, s = settings) => sameSettings(s, presetSettings(preset, s));
+
+  // Applying needs no confirmation when nothing would be lost: the current settings are a
+  // preset or the defaults.
+  function nothingToLose(s = settings) {
+    return sameSettings(s, defaultSettings()) || [...BUILT_IN_PRESETS, ...presets].some((preset) => matchesPreset(preset, s));
+  }
+
+  const presetById = (id) => BUILT_IN_PRESETS.find((p) => p.id === id) ?? presets.find((p) => p.id === id) ?? null;
+
+  // A clean own preset, or null. Names are trimmed and 1–24 characters long.
+  function validatePreset(entry) {
+    if (!entry || typeof entry !== "object" || typeof entry.id !== "string" || !entry.id || typeof entry.name !== "string")
+      return null;
+    const name = entry.name.trim();
+    if (!name || name.length > PRESET_NAME_MAX) return null;
+    const valid = validateSettings({ ...entry.settings, version: SCHEMA_VERSION });
+    return valid && { id: entry.id, name, settings: snapshot(valid) };
+  }
+
+  // Invalid entries (and any beyond 12) are dropped with one warning; an unreadable key gives
+  // an empty list and one warning. Storage is only rewritten by the next change.
+  function loadPresets(raw = Spicetify.LocalStorage.get(PRESETS_KEY)) {
+    if (raw == null) return [];
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {}
+    if (!data || data.version !== PRESETS_VERSION || !Array.isArray(data.presets)) {
+      console.warn("[gpb] Saved presets were unreadable and have been ignored.");
+      return [];
+    }
+    const list = [];
+    for (const entry of data.presets) {
+      const preset = validatePreset(entry);
+      if (!preset || list.length >= MAX_PRESETS || list.some((p) => p.id === preset.id)) continue;
+      preset.name = uniqueName(preset.name, list);
+      list.push(preset);
+    }
+    const dropped = data.presets.length - list.length;
+    if (dropped) console.warn(`[gpb] ${dropped} saved preset${dropped === 1 ? " was" : "s were"} invalid and dropped.`);
+    return list;
+  }
+
+  function savePresets() {
+    Spicetify.LocalStorage.set(PRESETS_KEY, JSON.stringify({ version: PRESETS_VERSION, presets }));
+  }
+
+  // Trimmed, at most 24 characters, and unique among the built-ins and `list` (case-insensitive,
+  // `exceptId` aside): a clash gets " (2)", " (3)" and so on.
+  function uniqueName(name, list = presets, exceptId = null) {
+    const base = name.trim().slice(0, PRESET_NAME_MAX);
+    const taken = new Set([...BUILT_IN_PRESETS, ...list].filter((p) => p.id !== exceptId).map((p) => p.name.toLowerCase()));
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let n = 2; ; n++) {
+      const suffix = ` (${n})`;
+      const candidate = base.slice(0, PRESET_NAME_MAX - suffix.length).trimEnd() + suffix;
+      if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+  }
+
+  const defaultPresetName = () => uniqueName(`Preset ${presets.length + 1}`);
+
+  function nextPresetId() {
+    const ids = new Set(presets.map((p) => p.id));
+    let n = 1;
+    while (ids.has(`p${n}`)) n++;
+    return `p${n}`;
+  }
+
+  // Saves the current settings as a new own preset. Returns it, or null at the limit.
+  function addPreset(name) {
+    if (presets.length >= MAX_PRESETS) return null;
+    const preset = { id: nextPresetId(), name: uniqueName(name.trim() || defaultPresetName()), settings: snapshot(settings) };
+    presets.push(preset);
+    savePresets();
+    return preset;
+  }
+
+  function renamePreset(id, name) {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset || !name.trim()) return false;
+    preset.name = uniqueName(name, presets, id);
+    savePresets();
+    return true;
+  }
+
+  function updatePreset(id) {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset) return false;
+    preset.settings = snapshot(settings);
+    savePresets();
+    return true;
+  }
+
+  // Own presets only: a built-in id finds nothing. Returns { preset, index } for Undo, or null.
+  function deletePreset(id) {
+    const index = presets.findIndex((p) => p.id === id);
+    if (index === -1) return null;
+    const [preset] = presets.splice(index, 1);
+    savePresets();
+    return { preset, index };
+  }
+
+  function restorePreset({ preset, index }) {
+    presets.splice(Math.min(index, presets.length), 0, preset);
+    savePresets();
+  }
+
+  // gpb1: + base64url(JSON) of { g: 0|1, m: "c"|"a"|"s", s: ["t" | "rrggbb", …] }, t = theme.
+  function encodeCode(s) {
+    const json = JSON.stringify({
+      g: s.gradient ? 1 : 0,
+      m: MODE_CODES[s.mode],
+      s: s.stops.map((stop) => (stop.kind === "theme" ? "t" : stop.color.slice(1))),
+    });
+    return CODE_PREFIX + btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  // Settings from a share code (stop ids s1…sN), checked by validateSettings(), or null.
+  // Surrounding whitespace is fine; an unknown prefix or version isn't.
+  function decodeCode(text) {
+    const code = String(text ?? "").trim();
+    const body = code.slice(CODE_PREFIX.length);
+    if (!code.startsWith(CODE_PREFIX) || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
+    let data = null;
+    try {
+      data = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || !Array.isArray(data.s)) return null;
+    // Anything unexpected is passed on as a value validateSettings() rejects.
+    const mode = Object.keys(MODE_CODES).find((key) => MODE_CODES[key] === data.m) ?? null;
+    return validateSettings({
+      version: SCHEMA_VERSION,
+      gradient: data.g === 1 ? true : data.g === 0 ? false : null,
+      mode,
+      stops: data.s.map((value, i) =>
+        value === "t"
+          ? { id: `s${i + 1}`, kind: "theme" }
+          : { id: `s${i + 1}`, kind: "custom", color: typeof value === "string" ? `#${value}` : null }
+      ),
+    });
+  }
+
   // ── Rendering ───────────────────────────────────────────────────────────────
 
   function stopColour(stop) {
@@ -1392,6 +1578,7 @@
       extensions: Spicetify.Config?.extensions ?? null,
       waveform: waveformActive(),
       eyedropper: !!window.EyeDropper, // the picker's eyedropper button exists only with it
+      presets: presets.length, // own presets (#21)
       spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
       entry: startup.entry,
       phase: startup.phase,
@@ -2696,6 +2883,7 @@
   let settings;
   try {
     settings = loadSettings();
+    presets = loadPresets(); // #21
     window.addEventListener("beforeunload", flushSettings);
     applyCss(); // the bar works even if no entry point can be registered
     window.__gpb = { version: VERSION, status: () => statusReport(), selfTest, open: () => modal || openModal() };
