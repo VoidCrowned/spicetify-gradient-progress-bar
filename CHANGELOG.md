@@ -2,6 +2,16 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.5.0] — 2026-10-18
+
+### Added
+- **Presets** ([#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21)). A new row below Spread has four built-in gradients (Sunset, Ocean, Aurora, Neon) and up to 12 of your own.
+  - Click a chip to apply it. If your current colours aren't saved anywhere, it first asks *Apply?*, so you can't lose them by accident.
+  - After applying, *Undo* is there for 10 seconds.
+  - The built-ins only change the colours and keep your Spread choice; your own presets bring back everything they saved.
+  - **+ Save** stores the current settings under a name. Right-click your own preset to rename it, update it to the current colours or delete it (with Undo).
+- **Share codes** ([#21](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/21)). *Copy code* puts a short code for your settings (`gpb1:…`, about 60–70 characters for three colours) on the clipboard. If the clipboard isn't available, the code shows selected so you can copy it yourself. *Import* takes a pasted code, applies it and offers Undo; an invalid code changes nothing.
+
 ## [1.4.1] — 2026-10-17
 
 ### Fixed
