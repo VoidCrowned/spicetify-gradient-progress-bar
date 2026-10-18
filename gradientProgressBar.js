@@ -588,6 +588,8 @@
 .gpb-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
 .gpb-share-button { display: inline-flex; align-items: center; align-self: center; gap: 6px; padding: 4px 12px 4px 10px; font-size: .8125rem; }
 .gpb-share-button > svg { flex: none; }
+.gpb-share-text { display: inline-grid; justify-items: center; }
+.gpb-share-text > span { grid-area: 1 / 1; }
 .gpb-share-button[aria-expanded="true"] { border-color: var(--spice-text); }
 .gpb-actions { display: flex; justify-content: center; align-items: center; }
 .gpb-actions > .gpb-button { align-self: center; }
@@ -647,7 +649,7 @@
 .gpb-name-field { flex: none; width: 18ch; height: 28px; padding: 0 12px; border-radius: 500px; text-align: left; }
 .gpb-undo { font-size: .8125rem; color: var(--spice-subtext); }
 .gpb-presets-tools { display: flex; align-items: center; gap: 8px; }
-.gpb-copied { font-size: .8125rem; color: var(--spice-subtext); }
+.gpb-code-hint { margin: 6px 0 0; font-size: .75rem; color: var(--spice-subtext); }
 .gpb-code-output, .gpb-code-input { font-family: ui-monospace, Consolas, monospace; font-size: .8125rem; text-align: left; }
 .gpb-import-row { display: flex; align-items: center; gap: 8px; }
 .gpb-import-row > .gpb-code-input { flex: 1; }
@@ -687,6 +689,11 @@
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 1.5 4.5 5h2.75v5.5h1.5V5h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
   const IMPORT_ICON = // arrow down into a tray (#52)
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5h1.5V7h2.75L8 10.5 4.5 7h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
+
+  const CHECK_ICON = // shown in place of a copy button's icon after copying (#54, #56)
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.53 3.47a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6 9.94l6.47-6.47a.75.75 0 0 1 1.06 0z"/></svg>';
+  // Both icons are in the markup and swapped with `hidden`, so no node is replaced (#26).
+  const withClass = (svg, className, hidden = false) => svg.replace("<svg ", `<svg class="${className}"${hidden ? " hidden" : ""} `);
 
   const EYEDROPPER_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.35 2.65a2 2 0 0 0-2.83 0L8.9 4.27l-.7-.71-1.06 1.06.7.71-5.3 5.3a1.5 1.5 0 0 0-.44 1.07L2 14l2.3-.1a1.5 1.5 0 0 0 1.07-.44l5.3-5.3.71.7 1.06-1.06-.7-.71 1.61-1.61a2 2 0 0 0 0-2.83zM4.3 12.4l-.8.04.04-.8 5.37-5.37.76.76z"/></svg>';
@@ -730,9 +737,8 @@
         <div class="gpb-presets-row">
           <span class="gpb-label" id="gpb-presets-label">Presets</span>
           <div class="gpb-presets-tools">
-            <span class="gpb-copied" aria-live="polite"></span>
-            <button type="button" class="gpb-button gpb-share-button gpb-export" title="${EXPORT_TITLE}">${EXPORT_ICON}<span>Export</span></button>
-            <button type="button" class="gpb-button gpb-share-button gpb-import" title="${IMPORT_TITLE}" aria-expanded="false" aria-controls="gpb-import-panel">${IMPORT_ICON}<span>Import</span></button>
+            <button type="button" class="gpb-button gpb-share-button gpb-export" title="${EXPORT_TITLE}">${withClass(EXPORT_ICON, "gpb-export-icon")}${withClass(CHECK_ICON, "gpb-export-check", true)}<span class="gpb-share-text"><span class="gpb-share-label gpb-export-label">${EXPORT_LABEL}</span><span class="gpb-sizer" aria-hidden="true">${EXPORT_LABEL}</span><span class="gpb-sizer" aria-hidden="true">${COPIED_LABEL}</span></span></button>
+            <button type="button" class="gpb-button gpb-share-button gpb-import" title="${IMPORT_TITLE}" aria-expanded="false" aria-controls="gpb-import-panel">${IMPORT_ICON}<span class="gpb-share-label">Import</span></button>
           </div>
         </div>
         <div class="gpb-chips" role="group" aria-labelledby="gpb-presets-label">
@@ -742,7 +748,10 @@
             <input type="text" class="gpb-field gpb-name-field" maxlength="${PRESET_NAME_MAX}" spellcheck="false" autocomplete="off" aria-label="Preset name" hidden>
           </div>
         </div>
-        <input type="text" class="gpb-field gpb-code-output" readonly spellcheck="false" aria-label="Share code (copy it from here)" hidden>
+        <div class="gpb-code-fallback" hidden>
+          <input type="text" class="gpb-field gpb-code-output" readonly spellcheck="false" aria-label="Share code (copy it from here)" aria-describedby="gpb-code-hint">
+          <p class="gpb-code-hint" id="gpb-code-hint">${COPY_HINT}</p>
+        </div>
         <div class="gpb-import-panel" id="gpb-import-panel" hidden>
           <div class="gpb-import-row">
             <input type="text" class="gpb-field gpb-code-input" spellcheck="false" autocomplete="off" placeholder="gpb1:…" aria-label="Paste a share code" aria-describedby="gpb-import-error">
@@ -798,7 +807,10 @@
       saveChip: root.querySelector(".gpb-save-chip"),
       nameField: root.querySelector(".gpb-name-field"),
       exportButton: root.querySelector(".gpb-export"),
-      copiedNote: root.querySelector(".gpb-copied"),
+      exportLabel: root.querySelector(".gpb-export-label"),
+      exportIcon: root.querySelector(".gpb-export-icon"),
+      exportCheck: root.querySelector(".gpb-export-check"),
+      codeFallback: root.querySelector(".gpb-code-fallback"),
       importButton: root.querySelector(".gpb-import"),
       codeOutput: root.querySelector(".gpb-code-output"),
       importPanel: root.querySelector(".gpb-import-panel"),
@@ -1097,23 +1109,88 @@
     });
   }
 
+  // ── Clipboard (#54) ──
+  // One helper for every copy: Export, the hex field's copy button (#56) and the self-test report.
+  // Spotify's client refuses navigator.clipboard.writeText, so Spicetify's ClipboardAPI goes first,
+  // then writeText, then execCommand("copy") from a hidden, selected textarea. An async tier that
+  // hasn't settled after CLIPBOARD_TIMEOUT_MS counts as failed. execCommand needs the click's user
+  // activation, which Chromium keeps for 5 s, so it still works after the other two have failed.
+
+  const CLIPBOARD_TIMEOUT_MS = 1500;
+  const clipboardSources = { // where the tiers come from; the self-test swaps these for stubs
+    api: () => window.Spicetify?.Platform?.ClipboardAPI,
+    clipboard: () => navigator.clipboard,
+    execCommand: (command) => document.execCommand(command),
+  };
+
+  // Resolves to the tier that worked ("ClipboardAPI", "writeText" or "execCommand"), or null.
+  async function writeClipboard(text) {
+    const settle = (promise) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS)),
+    ]);
+    const asyncTiers = [
+      ["ClipboardAPI", () => {
+        const api = clipboardSources.api();
+        if (typeof api?.copy !== "function") throw new Error("no ClipboardAPI");
+        return api.copy(text);
+      }],
+      ["writeText", () => {
+        const clipboard = clipboardSources.clipboard();
+        if (typeof clipboard?.writeText !== "function") throw new Error("no clipboard");
+        return clipboard.writeText(text);
+      }],
+    ];
+    for (const [name, write] of asyncTiers) {
+      try {
+        await settle(Promise.resolve().then(write));
+        return name;
+      } catch {}
+    }
+    return execCommandCopy(text) ? "execCommand" : null;
+  }
+
+  // The textarea goes inside the modal root while it's open (never into Spotify's DOM around it)
+  // and is removed straight away; focus goes back to where it was.
+  function execCommandCopy(text) {
+    const buffer = document.createElement("textarea");
+    buffer.className = "gpb-copy-buffer";
+    buffer.value = text;
+    buffer.readOnly = true;
+    buffer.tabIndex = -1;
+    buffer.setAttribute("aria-hidden", "true");
+    Object.assign(buffer.style, { position: "fixed", top: "0", left: "0", width: "1px", height: "1px", padding: "0", border: "0", opacity: "0", pointerEvents: "none" });
+    const focused = document.activeElement;
+    (modal?.root ?? document.body).append(buffer);
+    buffer.focus({ preventScroll: true });
+    buffer.select();
+    let copied = false;
+    try {
+      copied = clipboardSources.execCommand("copy") === true;
+    } catch {}
+    buffer.remove();
+    if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
+    return copied;
+  }
+
   // ── Sharing (#21) ──
-  // Export puts a gpb1: code on the clipboard; if that fails, the code shows in a selected
-  // read-only field instead. Import is an inline paste field, never navigator.clipboard.readText()
+  // Export puts a gpb1: code on the clipboard (writeClipboard()) and confirms on the button
+  // itself (#54); only if every tier fails does the code show in a selected read-only field. Import is an inline paste field, never navigator.clipboard.readText()
   // (that asks for a permission). While the field holds a valid code the strip previews it; Apply
   // is the deliberate step, with Undo (#51).
 
   const EXPORT_TITLE = "Copy a share code to the clipboard";
   const IMPORT_TITLE = "Paste a share code";
-  const COPIED_LABEL = "Copied"; // next to Export, so the button's label and width never change (#52)
+  const EXPORT_LABEL = "Export";
+  const COPIED_LABEL = "Copied"; // on the button for COPIED_MS; hidden sizers keep its width (#54)
   const COPIED_MS = 2000;
-  const CLIPBOARD_TIMEOUT_MS = 1500; // a clipboard write that never settles counts as failed
+  const COPY_HINT = /Mac/i.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy";
   const IMPORT_ERROR = "Not a valid code";
   const PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
 
   function enableSharing(m) {
     m.exportButton.addEventListener("click", () => copyCode(m));
-    m.codeOutput.addEventListener("blur", () => (m.codeOutput.hidden = true));
+    m.codeOutput.addEventListener("blur", () => (m.codeFallback.hidden = true));
     m.importButton.addEventListener("click", () => toggleImport(m));
     m.importApply.addEventListener("click", () => importCode(m));
     m.codeInput.addEventListener("input", () => {
@@ -1135,28 +1212,31 @@
     m.cleanups.push(() => clearTimeout(m.copiedTimer));
   }
 
-  // Resolves to true when the code reached the clipboard, false when the fallback field shows.
+  // Resolves to the tier that copied the code, or null when the fallback field shows instead.
   async function copyCode(m) {
     const code = encodeCode(settings);
-    try {
-      await Promise.race([
-        navigator.clipboard.writeText(code),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS)),
-      ]);
-    } catch {
-      if (modal !== m) return false;
+    const tier = await writeClipboard(code);
+    if (modal !== m) return tier;
+    showExportCopied(m, !!tier);
+    if (!tier) {
       m.codeOutput.value = code;
-      m.codeOutput.hidden = false;
+      m.codeFallback.hidden = false;
       m.codeOutput.focus({ preventScroll: true });
       m.codeOutput.select();
-      return false;
+      return null;
     }
-    if (modal !== m) return true;
-    m.codeOutput.hidden = true;
-    m.copiedNote.textContent = COPIED_LABEL;
+    m.codeFallback.hidden = true;
+    m.announce.textContent = "Share code copied";
+    return tier;
+  }
+
+  // In place: only the label's text and which icon is hidden change, never the button (#26).
+  function showExportCopied(m, copied) {
     clearTimeout(m.copiedTimer);
-    m.copiedTimer = setTimeout(() => (m.copiedNote.textContent = ""), COPIED_MS);
-    return true;
+    m.exportLabel.textContent = copied ? COPIED_LABEL : EXPORT_LABEL;
+    m.exportIcon.toggleAttribute("hidden", copied);
+    m.exportCheck.toggleAttribute("hidden", !copied);
+    if (copied) m.copiedTimer = setTimeout(() => showExportCopied(m, false), COPIED_MS);
   }
 
   // Opening empties the field and closing ends its preview, so the strip shows the current
@@ -2095,13 +2175,7 @@
   }
 
   async function copyText(text) {
-    try {
-      if (Spicetify.Platform?.ClipboardAPI?.copy) await Spicetify.Platform.ClipboardAPI.copy(text);
-      else await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
+    return !!(await writeClipboard(text));
   }
 
   let selfTestRunning = false;
@@ -3312,7 +3386,8 @@
       const problems = [];
       if (!(parseFloat(cs.borderTopWidth) >= 1) || cs.borderTopStyle !== "solid" || !border || border[3] === 0) problems.push(`${label}: border ${cs.borderTopWidth} ${cs.borderTopStyle} ${cs.borderTopColor}`);
       if (!svg || el.firstElementChild !== svg || Math.abs(svg.getBoundingClientRect().width - 14) > 0.5) problems.push(`${label}: icon ${svg ? svg.getBoundingClientRect().width.toFixed(1) + " px" : "missing"}`);
-      if (el.textContent.trim() !== label || el.title !== title) problems.push(`${label}: text "${el.textContent.trim()}", title "${el.title}"`);
+      const shown = el.querySelector(".gpb-share-label")?.textContent;
+      if (shown !== label || el.title !== title) problems.push(`${label}: label "${shown}", title "${el.title}"`);
       if (parseInt(cs.fontWeight, 10) < 700 || cs.borderTopLeftRadius === "0px") problems.push(`${label}: weight ${cs.fontWeight}, radius ${cs.borderTopLeftRadius}`);
       return problems;
     });
@@ -3610,44 +3685,83 @@
     check(21, "Undo after Import restores exactly", JSON.stringify(settings) === beforeImport, JSON.stringify(settings));
     stillOpen("Undo after importing");
 
-    // Export: a stubbed clipboard, a failing one, then the real one.
-    const clipboard = navigator.clipboard;
-    const ownWrite = clipboard && Object.prototype.hasOwnProperty.call(clipboard, "writeText");
-    const exportWidth = m.exportButton.getBoundingClientRect().width;
+    // Export (#54): writeClipboard()'s tiers in order with stubbed sources, then the real ones.
+    const realSources = { ...clipboardSources };
+    const exportWidth = () => m.exportButton.getBoundingClientRect().width;
+    const idleExportWidth = exportWidth();
+    const exportState = () => `"${m.exportLabel.textContent}", ${m.exportCheck.hasAttribute("hidden") ? "export" : "check"} icon, ${exportWidth().toFixed(1)} px`;
+    const showsCopied = () => m.exportLabel.textContent === COPIED_LABEL && m.exportIcon.hasAttribute("hidden") && !m.exportCheck.hasAttribute("hidden") &&
+      Math.abs(exportWidth() - idleExportWidth) <= 1;
+    const showsExport = () => m.exportLabel.textContent === EXPORT_LABEL && !m.exportIcon.hasAttribute("hidden") && m.exportCheck.hasAttribute("hidden");
     let captured = null;
+    let bufferSeen = "";
+    const tierLog = [];
+    const stubClipboard = ({ api, write, exec }) => { // each "ok", "fail" or undefined (not there)
+      tierLog.length = 0;
+      captured = null;
+      bufferSeen = "";
+      clipboardSources.api = () => api && { copy: async (text) => {
+        tierLog.push("ClipboardAPI");
+        if (api !== "ok") throw new Error("stub");
+        captured = text;
+      } };
+      clipboardSources.clipboard = () => write && { writeText: async (text) => {
+        tierLog.push("writeText");
+        if (write !== "ok") throw new Error("stub");
+        captured = text;
+      } };
+      clipboardSources.execCommand = (command) => {
+        tierLog.push("execCommand");
+        const buffer = document.activeElement;
+        bufferSeen = buffer?.classList.contains("gpb-copy-buffer") && m.root.contains(buffer) &&
+          buffer.selectionStart === 0 && buffer.selectionEnd === buffer.value.length ? "in the modal root, selected" : "not found";
+        if (exec !== "ok" || command !== "copy") return false;
+        captured = buffer?.value ?? null;
+        return true;
+      };
+    };
     try {
-      if (clipboard) {
-        clipboard.writeText = async (text) => void (captured = text);
-        const copied = await copyCode(m);
-        check(21, "Export writes gpb1:… of the current settings to the clipboard; 'Copied' beside it (live region); the button's label and width unchanged",
-          copied && captured === encodeCode(settings) && m.copiedNote.textContent === COPIED_LABEL &&
-            m.copiedNote.getAttribute("aria-live") === "polite" && m.exportButton.textContent.trim() === "Export" &&
-            Math.abs(m.exportButton.getBoundingClientRect().width - exportWidth) <= 1,
-          `${captured}; note "${m.copiedNote.textContent}", button "${m.exportButton.textContent.trim()}"`);
-        await sleep(COPIED_MS + 200);
-        check(21, `'Copied' disappears after ${COPIED_MS / 1000} s`, !m.copiedNote.textContent, m.copiedNote.textContent);
-      }
-      if (clipboard) clipboard.writeText = () => Promise.reject(new Error("denied"));
+      const code = encodeCode(settings);
+      stubClipboard({ api: "ok", write: "ok", exec: "ok" });
+      const viaApi = await copyCode(m);
+      check(54, "Export uses Spicetify's ClipboardAPI first; the button itself reads 'Copied' with the check icon, width ±1 px; 'Share code copied' announced",
+        viaApi === "ClipboardAPI" && tierLog.join() === "ClipboardAPI" && captured === code && showsCopied() &&
+          m.announce.textContent === "Share code copied" && m.codeFallback.hidden,
+        `tiers ${tierLog.join(" → ")}; ${exportState()} (was ${idleExportWidth.toFixed(1)} px); announced "${m.announce.textContent}"`);
+      await sleep(COPIED_MS + 200);
+      check(54, `The button reads 'Export' with its icon again after ${COPIED_MS / 1000} s`, showsExport(), exportState());
+      stubClipboard({ write: "ok", exec: "ok" });
+      const viaWrite = await copyCode(m);
+      check(54, "Without ClipboardAPI, navigator.clipboard.writeText is used", viaWrite === "writeText" && tierLog.join() === "writeText" &&
+        captured === code && showsCopied(), `tiers ${tierLog.join(" → ")}; ${exportState()}`);
+      stubClipboard({ api: "fail", write: "fail", exec: "ok" });
+      m.exportButton.focus({ preventScroll: true });
+      const viaExec = await copyCode(m);
+      check(54, "When both fail, execCommand('copy') copies from a hidden, selected textarea inside the modal root, which is removed again; focus returns",
+        viaExec === "execCommand" && tierLog.join() === "ClipboardAPI,writeText,execCommand" && captured === code &&
+          bufferSeen === "in the modal root, selected" && !document.querySelector(".gpb-copy-buffer") &&
+          document.activeElement === m.exportButton && showsCopied(),
+        `tiers ${tierLog.join(" → ")}; buffer ${bufferSeen}; focus .${document.activeElement?.className}`);
+      stubClipboard({ api: "fail", write: "fail", exec: "fail" });
       const copyNode = m.exportButton;
       realClick(copyNode);
       await sleep(50);
       const out = m.codeOutput;
-      check(21, "If the clipboard fails, the code shows in a read-only field, selected",
-        !out.hidden && out.readOnly && out.value === encodeCode(settings) && document.activeElement === out &&
-          out.selectionStart === 0 && out.selectionEnd === out.value.length && copyNode.isConnected,
-        `shown ${!out.hidden}, value ${out.value}, selected ${out.selectionStart}–${out.selectionEnd}`);
+      check(54, "When all three fail, the code shows in a read-only field, selected, with the hint; the button reads 'Export'",
+        tierLog.join() === "ClipboardAPI,writeText,execCommand" && !m.codeFallback.hidden && out.readOnly && out.value === code &&
+          document.activeElement === out && out.selectionStart === 0 && out.selectionEnd === out.value.length &&
+          m.codeFallback.querySelector(".gpb-code-hint")?.textContent === COPY_HINT && copyNode.isConnected && showsExport(),
+        `tiers ${tierLog.join(" → ")}; shown ${!m.codeFallback.hidden}, selected ${out.selectionStart}–${out.selectionEnd}, hint "${m.codeFallback.querySelector(".gpb-code-hint")?.textContent}"`);
       stillOpen("Export");
     } finally {
-      if (clipboard && !ownWrite) delete clipboard.writeText;
+      Object.assign(clipboardSources, realSources);
     }
-    if (clipboard) {
-      const reached = await copyCode(m);
-      check(21, "Export with the real clipboard: copied, or the fallback field appears",
-        reached ? m.copiedNote.textContent === COPIED_LABEL : !m.codeOutput.hidden,
-        reached ? "copied" : "clipboard refused; fallback field shown");
-    }
-    m.codeOutput.hidden = true;
-    stillOpen("the Presets row");
+    m.codeFallback.hidden = true;
+    const realTier = await copyCode(m);
+    check(54, "Export with the real clipboard: the code reaches it through one of the tiers, without the fallback field",
+      !!realTier && m.codeFallback.hidden, realTier ? `via ${realTier}` : "every tier failed; fallback field shown");
+    m.codeFallback.hidden = true;
+        stillOpen("the Presets row");
 
     realClick(resetBtn);
     realClick(resetBtn);

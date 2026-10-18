@@ -7,6 +7,9 @@ All notable changes to Gradient Progress Bar. Versions follow [semantic versioni
 ### Changed
 - **New built-in presets** ([#53](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/53)): Void, Sunset, Aurora, Neon and Fairy, in their own row. Your own presets and **+ Save** are in the row below. Ocean is gone, and Sunset and Neon have new colours. If one of your own presets has the same name as a built-in, it's shown as "Name (2)".
 
+### Fixed
+- **Export copies straight to the clipboard** ([#54](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/54)). Spotify's client refuses the browser's clipboard, so Export always showed the code field instead. It now copies through Spicetify's clipboard, with two fallbacks. The button itself confirms with *Copied* and a check mark for 2 seconds. The code field only appears if copying fails completely.
+
 ## [1.6.0] — 2026-10-18
 
 ### Changed
