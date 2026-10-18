@@ -145,7 +145,6 @@ Agreed ideas, not scheduled.
 | [#19](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/19) | Hover behaviour option | |
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
-| [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | only if right-click isn't enough |
 
 ## Not planned
 
@@ -155,3 +154,4 @@ Ideas that were considered and dropped.
 |---|---|---|
 | [#16](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/16) | Gradient direction / angle | The bar is only a few pixels tall, so any angle other than left → right is barely visible; it would also complicate every Spread mode's sizing. |
 | [#17](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/17) | Per-stop opacity | A darker or lighter colour gives the same look without the complexity of semi-transparent stops over the track and hover backgrounds. |
+| [#29](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/29) | Own visible settings button independent of Spicetify UI wrappers | Right-click on the bar always works, and the top-bar button and profile-menu entry show wherever Spicetify can render them (#45). An injected button would be the extension's only element reference (hard rule 5) and need fixing after Spotify updates. |
