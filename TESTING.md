@@ -76,10 +76,10 @@ It covers:
   - store: save → load round-trip in `gpb:presets`; invalid entries, duplicate ids and any beyond 12 dropped with one warning; a corrupt or unknown key gives an empty list and one warning; names trimmed, ≤ 24 characters, unique (built-ins included, any case); built-ins can't be deleted, renamed or updated;
   - codes: round-trip for theme and custom stops, every mode, gradient on and off; garbage, a wrong prefix, 9 stops, a bad hex, an unknown or missing mode and `g` 2 rejected; whitespace accepted;
   - layout: the Presets row between Spread and the preview, label left, Copy code and Import right, every chip reachable; built-ins first, own presets, + Save last; 12 px swatches painted with `fillImage()`;
-  - two-step apply with real clicks: the first click arms (*Apply?*, width ±1 px) without changing anything; Escape, 3 s and a click elsewhere disarm; the second click applies (built-ins keep the mode, own presets restore everything) on the same chip node; one click when the settings are a preset or the defaults; the active chip has `aria-pressed` and a `--spice-button` border;
+  - two-step apply with real clicks (#51): the first click arms (*Apply?*, width ±1 px) and previews the preset in the strip, with *Previewing "Ocean" — …* in the status line, while the settings, `#gpb-style`, the dots and the picker stay unchanged; still armed after 3.5 s; a click on another chip moves the arm and the preview; Escape and a click elsewhere revert the strip and the status line; the second click applies (built-ins keep the mode, own presets restore everything) on the same chip node, and the strip follows; two clicks also from a preset or the defaults; a click on the active chip does nothing; disarming shows a running Undo again; the active chip has `aria-pressed` and a `--spice-button` border;
   - Undo after apply, import and delete restores exactly; a new action replaces it; later edits drop it; it expires after 10 s;
   - + Save: an inline field prefilled *Preset 1*; Escape cancels; Enter saves, stores and shows the new chip, active and focused; disabled at 12; the chip menu (Rename, Update to current colours, Delete; none on built-ins), also with Shift+F10; Rename with a clash gets *(2)*;
-  - Import: an invalid code is flagged and changes nothing; a valid one applies at once and offers Undo; Copy code reaches a (stubbed) clipboard with *Copied*, a failing clipboard shows the selected fallback field, and the real clipboard either copies or falls back;
+  - Import: a valid code in the field previews in the strip (*Previewing code — Apply to use it*) without changing anything, clearing the field or Escape reverts it; an invalid code is flagged and changes nothing; a valid one applies and offers Undo; Copy code reaches a (stubbed) clipboard with *Copied*, a failing clipboard shows the selected fallback field, and the real clipboard either copies or falls back;
   - the settings stay open after every chip, menu, Save, Import, Copy and Undo action, and the clicked chip, menu item or button is never detached.
 - Bar size, radius and waveform masks unchanged.
 
@@ -106,7 +106,8 @@ What needs a human (≤ 8 items):
 6. No theme (`spicetify config inject_css 0 replace_colors 0 inject_theme_js 0`, `spicetify apply`; restore with `1 1 1`) → bar and modal readable, theme stop falls back sensibly.
 7. Reload Spotify → settings persist; the profile menu opens, and our entry shows with its icon when `__gpb.status().menu.menuItemUsable` is true and is absent when it's false; the brush button shows in the top bar wherever Spicetify's top bar works (#38); a podcast episode and a window resize → no `[gpb]` errors in the console.
 8. Reset and presets: Reset → *Confirm reset?* (red) → a second click resets; waiting 3 s or clicking elsewhere cancels.
-   - The Presets chip row looks tidy and wraps nicely; an armed chip (*Apply?*) reads clearly; the Undo line is easy to spot.
+   - Click a preset: the strip in the settings window shows it and the bar stays as it is; click it again: the bar changes. Esc cancels.
+   - The Presets chip row looks tidy and wraps nicely; the Undo line is easy to spot.
    - *Copy code* in one settings state, change things, *Import* the code → the first state is back.
 
 Add a self-test check (preferred) or a visual item whenever a fix addresses something neither layer covered yet.

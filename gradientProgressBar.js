@@ -178,12 +178,6 @@
 
   const matchesPreset = (preset, s = settings) => sameSettings(s, presetSettings(preset, s));
 
-  // Applying needs no confirmation when nothing would be lost: the current settings are a
-  // preset or the defaults.
-  function nothingToLose(s = settings) {
-    return sameSettings(s, defaultSettings()) || [...BUILT_IN_PRESETS, ...presets].some((preset) => matchesPreset(preset, s));
-  }
-
   const presetById = (id) => BUILT_IN_PRESETS.find((p) => p.id === id) ?? presets.find((p) => p.id === id) ?? null;
 
   // A clean own preset, or null. Names are trimmed and 1–24 characters long.
@@ -625,7 +619,7 @@
 .gpb-colour-picker .gpb-button { align-self: stretch; padding: 6px 12px; font-size: .875rem; }
 .gpb-presets > * { margin: 0; }
 .gpb-presets > * + * { margin-top: 8px; }
-.gpb-presets > .gpb-undo:not(.gpb-has-undo) { margin-top: 0; }
+.gpb-presets > .gpb-undo:not(.gpb-has-status) { margin-top: 0; }
 .gpb-presets-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gpb-text-button { display: inline-grid; padding: 2px 8px; border: 0; border-radius: 500px; background: none; color: var(--spice-subtext); font: inherit; font-size: .8125rem; font-weight: 700; cursor: pointer; }
 .gpb-text-button > span { grid-area: 1 / 1; }
@@ -1011,10 +1005,11 @@
   }
 
   // ── Presets row (#21) ──
-  // Chips for the built-ins, then own presets, then + Save. Applying is two-step like Reset:
-  // the first click arms the chip ("Apply?"; hidden sizers keep its width), the second applies;
-  // one click is enough when nothing would be lost (nothingToLose()). Undo for 10 s after
-  // applying, importing or deleting. Arming changes only a label and a class, in place;
+  // Chips for the built-ins, then own presets, then + Save. Applying is always two-step: the
+  // first click arms the chip ("Apply?"; hidden sizers keep its width) and previews it in the
+  // strip, the second applies (#51). Themes often hide the player behind the popup, so the strip
+  // is the preview, not the bar. No timeout while armed; the active chip does nothing. Undo for
+  // 10 s after applying, importing or deleting. Arming changes only a label and a class, in place;
   // re-rendering the chip row (Save, Rename, Update, Delete) is deferred and closes the menu
   // first, so a clicked chip or menu item is never detached during its own click (#26).
 
@@ -1086,21 +1081,26 @@
   // ── Sharing (#21) ──
   // Copy code puts a gpb1: code on the clipboard; if that fails, the code shows in a selected
   // read-only field instead. Import is an inline paste field, never navigator.clipboard.readText()
-  // (that asks for a permission). Opening the field is the deliberate step, so a valid code
-  // applies without arming, with Undo.
+  // (that asks for a permission). While the field holds a valid code the strip previews it; Apply
+  // is the deliberate step, with Undo (#51).
 
   const COPY_LABEL = "Copy code";
   const COPIED_LABEL = "Copied";
   const COPIED_MS = 2000;
   const CLIPBOARD_TIMEOUT_MS = 1500; // a clipboard write that never settles counts as failed
   const IMPORT_ERROR = "Not a valid code";
+  const PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
 
   function enableSharing(m) {
     m.copyButton.addEventListener("click", () => copyCode(m));
     m.codeOutput.addEventListener("blur", () => (m.codeOutput.hidden = true));
     m.importButton.addEventListener("click", () => toggleImport(m));
     m.importApply.addEventListener("click", () => importCode(m));
-    m.codeInput.addEventListener("input", () => setImportError(m, false));
+    m.codeInput.addEventListener("input", () => {
+      setImportError(m, false);
+      renderPreview(); // a valid code previews in the strip (#51)
+      renderStatus();
+    });
     m.codeInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -1139,13 +1139,19 @@
     return true;
   }
 
+  // Opening empties the field and closing ends its preview, so the strip shows the current
+  // settings either way.
   function toggleImport(m, open = m.importPanel.hidden) {
     m.importPanel.hidden = !open;
     m.importButton.setAttribute("aria-expanded", String(open));
-    if (!open) return;
-    m.codeInput.value = "";
-    setImportError(m, false);
-    m.codeInput.focus({ preventScroll: true });
+    if (open) {
+      m.codeInput.value = "";
+      setImportError(m, false);
+      m.codeInput.focus({ preventScroll: true });
+    }
+    if (modal !== m) return;
+    renderPreview();
+    renderStatus();
   }
 
   function setImportError(m, invalid) {
@@ -1168,10 +1174,13 @@
     return true;
   }
 
+  // The active chip does nothing; any other is armed (and previewed) by the first click and
+  // applied by the second. A click on another chip disarms this one first (outside input), so
+  // browsing moves the arm and the preview chip by chip.
   function clickChip(m, chip) {
     const preset = presetById(chip.dataset.preset);
-    if (!preset) return;
-    if (m.armed?.chip !== chip && !nothingToLose()) return armChip(m, chip, preset);
+    if (!preset || matchesPreset(preset)) return;
+    if (m.armed?.chip !== chip) return armChip(m, chip, preset);
     disarmChip(m);
     applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
   }
@@ -1181,18 +1190,30 @@
     chip.classList.add("gpb-armed");
     chip.querySelector(".gpb-chip-label").textContent = APPLY_LABEL;
     chip.setAttribute("aria-label", `Apply "${preset.name}"?`);
-    m.armed = { chip, timer: setTimeout(() => disarmChip(m), RESET_CONFIRM_MS) };
+    m.armed = { chip, name: preset.name, settings: presetSettings(preset) };
+    renderPreview();
+    renderStatus();
   }
 
   function disarmChip(m) {
     if (!m.armed) return;
-    const { chip, timer } = m.armed;
+    const { chip } = m.armed;
     m.armed = null;
-    clearTimeout(timer);
     const name = presetById(chip.dataset.preset)?.name ?? "";
     chip.classList.remove("gpb-armed");
     chip.querySelector(".gpb-chip-label").textContent = name;
     chip.setAttribute("aria-label", name);
+    if (modal !== m) return;
+    renderPreview();
+    renderStatus();
+  }
+
+  // What the strip shows instead of the current settings (#51): the armed chip's preset, or a
+  // valid code in the open Import field. Null when nothing is being previewed.
+  function previewing(m) {
+    if (m.armed) return { settings: m.armed.settings, message: `Previewing "${m.armed.name}" — click it again to apply, Esc to cancel` };
+    const code = m.importPanel.hidden ? null : decodeCode(m.codeInput.value);
+    return code && { settings: code, message: PREVIEW_CODE_MESSAGE };
   }
 
   // Replaces the settings (selection back on the first dot) and offers Undo for the old ones.
@@ -1229,14 +1250,14 @@
     clearUndo();
     const after = trackSettings ? JSON.stringify(settings) : null;
     pendingUndo = { message, kind, restore, after, timer: setTimeout(clearUndo, UNDO_MS) };
-    renderUndo();
+    renderStatus();
   }
 
   function clearUndo() {
     if (!pendingUndo) return;
     clearTimeout(pendingUndo.timer);
     pendingUndo = null;
-    renderUndo();
+    renderStatus();
   }
 
   // The Undo button is hidden, not removed, in its own click (#26).
@@ -1248,11 +1269,15 @@
     undo.restore(hadFocus);
   }
 
-  function renderUndo() {
+  // The status line under the chips: a preview's message wins (#51); when the preview ends, a
+  // still-running Undo shows again.
+  function renderStatus() {
     if (!modal) return;
-    modal.undoLine.classList.toggle("gpb-has-undo", !!pendingUndo);
-    modal.undoText.textContent = pendingUndo ? `${pendingUndo.message} · ` : "";
-    modal.undoButton.hidden = !pendingUndo;
+    const preview = previewing(modal);
+    const undo = !preview && pendingUndo;
+    modal.undoLine.classList.toggle("gpb-has-status", !!(preview || undo));
+    modal.undoText.textContent = preview ? preview.message : undo ? `${undo.message} · ` : "";
+    modal.undoButton.hidden = !undo;
   }
 
   // ── Chip row rendering ──
@@ -1884,9 +1909,10 @@
     modal.switchButton.setAttribute("aria-checked", String(settings.gradient));
   }
 
-  // The bar at 100 %, from the same gradient string as the stylesheet.
+  // The bar at 100 %, from the same gradient string as the stylesheet: the current settings, or
+  // the preset or code being previewed (#51). Only the background-image changes, in place.
   function renderPreview() {
-    modal.preview.style.backgroundImage = fillImage(settings);
+    modal.preview.style.backgroundImage = fillImage(previewing(modal)?.settings ?? settings);
   }
 
   function renderStops() {
@@ -3241,31 +3267,56 @@
         chipSwatch.style.backgroundImage === swatchProbe.style.backgroundImage,
       `${chipIds()}; swatch ${swatchRect?.width.toFixed(1)}×${swatchRect?.height.toFixed(1)}, ${chipSwatch?.style.backgroundImage}`);
 
-    // Two-step apply. Not a preset and not the defaults, so the first click only arms.
+    // Two-step apply with a preview in the strip (#51): always two clicks, no timeout.
     setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
     const notAPreset = JSON.stringify(settings);
+    const cssBeforePreview = styleText();
+    const stripProbe = document.createElement("span"); // the same serialisation as the strip's inline style
+    const stripShows = (s) => {
+      stripProbe.style.backgroundImage = fillImage(s);
+      return m.preview.style.backgroundImage === stripProbe.style.backgroundImage;
+    };
+    const statusText = () => m.undoText.textContent;
+    const previewMessage = (name) => `Previewing "${name}" — click it again to apply, Esc to cancel`;
+    const untouched = () => JSON.stringify(settings) === notAPreset && styleText() === cssBeforePreview;
     const ocean = chipOf("b:ocean");
     const oceanLabel = () => ocean.querySelector(".gpb-chip-label").textContent;
     const idleChipWidth = ocean.getBoundingClientRect().width;
+    const dotNodes = dots();
+    const hexBefore = m.hex.value;
     realClick(ocean);
     const armedChipWidth = ocean.getBoundingClientRect().width;
-    check(21, "First click on a chip arms it ('Apply?', --spice-button border, width ±1 px) without changing the settings",
-      ocean.classList.contains("gpb-armed") && oceanLabel() === APPLY_LABEL && JSON.stringify(settings) === notAPreset &&
-        Math.abs(armedChipWidth - idleChipWidth) <= 1,
-      `label "${oceanLabel()}", width ${idleChipWidth.toFixed(1)} → ${armedChipWidth.toFixed(1)} px`);
+    check(51, "First click on a chip arms it ('Apply?', width ±1 px) and previews it in the strip; settings, #gpb-style, dots and picker unchanged",
+      ocean.classList.contains("gpb-armed") && oceanLabel() === APPLY_LABEL && Math.abs(armedChipWidth - idleChipWidth) <= 1 &&
+        stripShows(presetSettings(BUILT_IN_PRESETS[1])) && untouched() &&
+        dots().every((el, i) => el === dotNodes[i]) && dots().length === dotNodes.length && m.hex.value === hexBefore,
+      `label "${oceanLabel()}", width ${idleChipWidth.toFixed(1)} → ${armedChipWidth.toFixed(1)} px; strip ${m.preview.style.backgroundImage}`);
+    check(51, "While previewing, the status line (polite live region) reads 'Previewing \"Ocean\" — click it again to apply, Esc to cancel'",
+      statusText() === previewMessage("Ocean") && m.undoButton.hidden && m.undoLine.getAttribute("aria-live") === "polite",
+      `"${statusText()}"`);
     stillOpen("arming a preset chip");
     press(ocean, "Escape");
-    check(21, "Escape disarms the chip without applying", !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" &&
-      JSON.stringify(settings) === notAPreset, `label "${oceanLabel()}"`);
+    check(51, "Escape disarms the chip: the strip shows the current settings again, the status line is empty, nothing applied",
+      !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" && stripShows(settings) && !statusText() && untouched(),
+      `label "${oceanLabel()}", status "${statusText()}"`);
     stillOpen("Escape on an armed chip");
     realClick(ocean);
-    await sleep(RESET_CONFIRM_MS + 200);
-    check(21, `An armed chip disarms after ${RESET_CONFIRM_MS / 1000} s without applying`,
-      !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" && JSON.stringify(settings) === notAPreset, `label "${oceanLabel()}"`);
-    realClick(ocean);
+    await sleep(RESET_CONFIRM_MS + 500);
+    check(51, `No timeout while previewing: still armed and previewing after ${(RESET_CONFIRM_MS + 500) / 1000} s`,
+      ocean.classList.contains("gpb-armed") && stripShows(presetSettings(BUILT_IN_PRESETS[1])) && statusText() === previewMessage("Ocean") && untouched(),
+      `label "${oceanLabel()}", status "${statusText()}"`);
+    const aurora = chipOf("b:aurora");
+    realClick(aurora);
+    check(51, "A click on another chip moves the arm and the preview to it in one click",
+      !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" && aurora.classList.contains("gpb-armed") &&
+        stripShows(presetSettings(BUILT_IN_PRESETS[2])) && statusText() === previewMessage("Aurora") && untouched(),
+      `armed ${m.armed?.chip.dataset.preset}, status "${statusText()}"`);
+    stillOpen("moving the arm to another chip");
     realClick(dots()[0]);
-    check(21, "Clicking elsewhere disarms the chip", !ocean.classList.contains("gpb-armed") && JSON.stringify(settings) === notAPreset,
-      `label "${oceanLabel()}"`);
+    check(51, "A click elsewhere disarms: the strip reverts, the status line clears, nothing applied",
+      !aurora.classList.contains("gpb-armed") && !m.armed && stripShows(settings) && !statusText() && untouched(),
+      `status "${statusText()}"`);
+    stillOpen("a click outside an armed chip");
     selectStop("s2");
     realClick(ocean);
     realClick(ocean);
@@ -3274,6 +3325,8 @@
       appliedOpen && sameSettings(settings, presetSettings(BUILT_IN_PRESETS[1])) && settings.mode === "anchored" &&
         selectionIs(settings.stops[0].id) && chipOf("b:ocean") === ocean && ocean.isConnected,
       `${settings.mode}, ${settings.stops.map((s) => s.color).join(", ")}; ${selection()}`);
+    check(51, "After applying, the strip and #gpb-style show the applied settings",
+      stripShows(settings) && styleText() === buildCss(settings) && !ocean.classList.contains("gpb-armed"), m.preview.style.backgroundImage);
     stillOpen("applying a preset");
     const buttonColour = computedRgb(m.root, "var(--spice-button)");
     const oceanBorder = parseRgb(getComputedStyle(ocean).borderTopColor);
@@ -3281,16 +3334,25 @@
       pressed() === "b:ocean" && !!oceanBorder && !!buttonColour && oceanBorder.slice(0, 3).every((v, i) => Math.abs(v - buttonColour[i]) <= 1),
       `pressed ${pressed()}, border ${getComputedStyle(ocean).borderTopColor}`);
     check(21, "Undo line after applying: 'Applied \"Ocean\" · Undo' in a polite live region", undoShows('Applied "Ocean"'), undoState());
+    const oceanApplied = JSON.stringify(settings);
+    realClick(ocean);
+    check(51, "A click on the active chip does nothing: not armed, nothing applied, the Undo kept",
+      !ocean.classList.contains("gpb-armed") && !m.armed && JSON.stringify(settings) === oceanApplied && undoShows('Applied "Ocean"'),
+      `armed ${!!m.armed}, ${undoState()}`);
 
     const sunset = chipOf("b:sunset");
     realClick(sunset);
-    check(21, "One click applies when nothing would be lost (the current settings are a preset)",
-      sameSettings(settings, presetSettings(BUILT_IN_PRESETS[0])) && !sunset.classList.contains("gpb-armed") && pressed() === "b:sunset",
-      `pressed ${pressed()}, ${undoState()}`);
+    const sunsetPreview = statusText() === previewMessage("Sunset") && m.undoButton.hidden && JSON.stringify(settings) === oceanApplied;
+    press(sunset, "Escape");
+    check(51, "Two clicks even when the current settings are a preset; disarming shows the still-running Undo again",
+      sunsetPreview && undoShows('Applied "Ocean"') && JSON.stringify(settings) === oceanApplied, `previewed ${sunsetPreview}; ${undoState()}`);
+    realClick(sunset);
+    realClick(sunset);
+    const sunsetApplied = sameSettings(settings, presetSettings(BUILT_IN_PRESETS[0])) && pressed() === "b:sunset";
     const oceanState = presetSettings(BUILT_IN_PRESETS[1]);
     realClick(m.undoButton);
     check(21, "A new action replaces the pending undo: Undo goes back to Ocean, not further",
-      sameSettings(settings, oceanState) && selectionIs(settings.stops[0].id) && m.undoButton.hidden && !m.undoText.textContent,
+      sunsetApplied && sameSettings(settings, oceanState) && selectionIs(settings.stops[0].id) && m.undoButton.hidden && !m.undoText.textContent,
       `${settings.stops.map((s) => s.color).join(", ")}; ${undoState()}`);
     stillOpen("Undo after applying");
 
@@ -3305,8 +3367,11 @@
     stillOpen("Undo after applying");
     setTestSettings(false, [theme("s1")]);
     realClick(chipOf("b:neon"));
-    check(21, "One click applies when the current settings are the defaults",
-      sameSettings(settings, presetSettings(BUILT_IN_PRESETS[3])) && pressed() === "b:neon", `pressed ${pressed()}`);
+    const neonArmed = chipOf("b:neon").classList.contains("gpb-armed") && sameSettings(settings, defaultSettings());
+    realClick(chipOf("b:neon"));
+    check(51, "Two clicks from the defaults too: the first only arms, the second applies Neon",
+      neonArmed && sameSettings(settings, presetSettings(BUILT_IN_PRESETS[3])) && pressed() === "b:neon",
+      `armed first ${neonArmed}, pressed ${pressed()}`);
     setStopColour(settings.stops[0].id, BLUE);
     check(21, "Editing the colours afterwards drops the pending undo, so it never throws away later edits",
       m.undoButton.hidden && !pendingUndo, undoState());
@@ -3436,9 +3501,26 @@
       `panel open ${importOpen}, aria-invalid ${m.codeInput.getAttribute("aria-invalid")}, error "${m.importError.textContent}"`);
     stillOpen("an invalid import");
     const shared = { version: SCHEMA_VERSION, gradient: true, mode: "slide", stops: [theme("x"), custom("y", BLUE)] };
-    m.codeInput.value = `  ${encodeCode(shared)}  `;
-    m.codeInput.dispatchEvent(new Event("input", { bubbles: true }));
+    const cssBeforeImport = styleText();
+    const typeCode = (value) => {
+      m.codeInput.value = value;
+      m.codeInput.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    typeCode(`  ${encodeCode(shared)}  `);
     const errorCleared = !m.codeInput.hasAttribute("aria-invalid") && !m.importError.textContent;
+    check(51, "A valid code in the Import field previews in the strip ('Previewing code — Apply to use it'); settings and #gpb-style unchanged",
+      errorCleared && stripShows(shared) && statusText() === PREVIEW_CODE_MESSAGE && JSON.stringify(settings) === beforeImport &&
+        styleText() === cssBeforeImport, `status "${statusText()}"`);
+    typeCode("");
+    const clearedReverts = stripShows(settings) && !statusText();
+    typeCode(encodeCode(shared));
+    press(m.codeInput, "Escape");
+    check(51, "Clearing the field or Escape (field closed) reverts the strip and the status line",
+      clearedReverts && m.importPanel.hidden && stripShows(settings) && !statusText() && JSON.stringify(settings) === beforeImport,
+      `cleared reverts ${clearedReverts}; panel hidden ${m.importPanel.hidden}, status "${statusText()}"`);
+    stillOpen("previewing a code");
+    realClick(m.importButton);
+    typeCode(`  ${encodeCode(shared)}  `);
     realClick(applyNode);
     check(21, "Import: a valid code applies at once (no arming), the field closes, 'Imported code · Undo'; Apply stays connected",
       errorCleared && sameSettings(settings, shared) && m.importPanel.hidden && undoShows("Imported code") && applyNode.isConnected,
