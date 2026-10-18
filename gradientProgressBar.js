@@ -622,7 +622,11 @@
 .gpb-field { width: 100%; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 6px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 4px; background-color: rgba(var(--spice-rgb-text), .08); color: var(--spice-text); font: inherit; font-size: .875rem; text-align: center; }
 .gpb-field:focus { outline: none; border-color: var(--spice-text); }
 .gpb-field[aria-invalid="true"] { border-color: var(--spice-notification-error, #e91429); }
-.gpb-hex { flex: none; width: 10ch; font-family: ui-monospace, Consolas, monospace; text-align: left; }
+.gpb-hex-wrap { position: relative; flex: none; display: flex; }
+.gpb-hex { flex: none; width: calc(10ch + 24px); padding-right: 28px; font-family: ui-monospace, Consolas, monospace; text-align: left; }
+.gpb-hex-copy { position: absolute; top: 50%; right: 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; margin: -12px 0 0; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--spice-subtext); cursor: pointer; }
+.gpb-hex-copy:hover { color: var(--spice-text); }
+.gpb-hex-copy:focus-visible { outline: 2px solid var(--spice-text); outline-offset: -1px; }
 .gpb-colour-picker .gpb-button { align-self: stretch; padding: 6px 12px; font-size: .875rem; }
 .gpb-presets > * { margin: 0; }
 .gpb-presets > * + * { margin-top: 8px; }
@@ -690,6 +694,8 @@
   const IMPORT_ICON = // arrow down into a tray (#52)
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5h1.5V7h2.75L8 10.5 4.5 7h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
 
+  const COPY_ICON = // two overlapping rounded squares: the hex field's copy button (#56)
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M5 1.75A1.75 1.75 0 0 1 6.75 0h6.5A1.75 1.75 0 0 1 15 1.75v6.5A1.75 1.75 0 0 1 13.25 10H11V8.5h2.25a.25.25 0 0 0 .25-.25v-6.5a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25V4H5z"/><path d="M1 6.75C1 5.784 1.784 5 2.75 5h6.5c.966 0 1.75.784 1.75 1.75v6.5A1.75 1.75 0 0 1 9.25 15h-6.5A1.75 1.75 0 0 1 1 13.25zm1.75-.25a.25.25 0 0 0-.25.25v6.5c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-6.5a.25.25 0 0 0-.25-.25z"/></svg>';
   const CHECK_ICON = // shown in place of a copy button's icon after copying (#54, #56)
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.53 3.47a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L6 9.94l6.47-6.47a.75.75 0 0 1 1.06 0z"/></svg>';
   // Both icons are in the markup and swapped with `hidden`, so no node is replaced (#26).
@@ -782,7 +788,13 @@
               `<label class="gpb-channel"><input type="text" class="gpb-field gpb-channel-input" inputmode="numeric" maxlength="3" spellcheck="false" autocomplete="off" aria-label="${name}"><span>${name[0]}</span></label>`
             ).join("")}
           </div>
-          <label class="gpb-hex-row"><span>HEX:</span><input type="text" class="gpb-field gpb-hex" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Hex code"></label>
+          <div class="gpb-hex-row">
+            <label for="gpb-hex-input">HEX:</label>
+            <span class="gpb-hex-wrap">
+              <input type="text" class="gpb-field gpb-hex" id="gpb-hex-input" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Hex code">
+              <button type="button" class="gpb-hex-copy" aria-label="${HEX_COPY_LABEL}" title="${HEX_COPY_LABEL}">${withClass(COPY_ICON, "gpb-hex-copy-icon")}${withClass(CHECK_ICON, "gpb-hex-copy-check", true)}</button>
+            </span>
+          </div>
           <button type="button" class="gpb-button gpb-use-theme">Use theme colour</button>
         </div>
       </div>
@@ -846,6 +858,10 @@
       eyedropper: root.querySelector(".gpb-eyedropper"),
       rgb: [...root.querySelectorAll(".gpb-channel-input")],
       hex: root.querySelector(".gpb-hex"),
+      hexWrap: root.querySelector(".gpb-hex-wrap"),
+      hexCopy: root.querySelector(".gpb-hex-copy"),
+      hexCopyIcon: root.querySelector(".gpb-hex-copy-icon"),
+      hexCopyCheck: root.querySelector(".gpb-hex-copy-check"),
       useThemeButton: root.querySelector(".gpb-use-theme"),
       cleanups: [],
     };
@@ -1688,6 +1704,37 @@
 
   const pickerStop = () => (modal ? findStop(selectedId) : null);
 
+  // ── Hex copy button (#56) ──
+  // Copies the selected stop's colour as #rrggbb (a theme stop's resolved colour), never the
+  // field's text, so half-typed or invalid input can't be copied. Through writeClipboard() (#54);
+  // the icon turns into a check for HEX_COPIED_MS. Nothing else changes and nothing re-renders.
+
+  const HEX_COPY_LABEL = "Copy hex code";
+  const HEX_COPIED_MS = 1500;
+
+  async function copyHex(m) {
+    const stop = pickerStop();
+    if (!stop) return null;
+    const tier = await writeClipboard(resolveStop(stop));
+    if (modal !== m) return tier;
+    if (!tier) {
+      m.hex.focus({ preventScroll: true }); // every tier failed: Ctrl+C on the selected field works
+      m.hex.select();
+      return null;
+    }
+    clearTimeout(m.hexCopiedTimer);
+    showHexCopied(m, true);
+    m.hexCopiedTimer = setTimeout(() => showHexCopied(m, false), HEX_COPIED_MS);
+    m.announce.textContent = "Hex code copied";
+    return tier;
+  }
+
+  // In place: only which icon is hidden changes, never the button (#26).
+  function showHexCopied(m, copied) {
+    m.hexCopyIcon.toggleAttribute("hidden", copied);
+    m.hexCopyCheck.toggleAttribute("hidden", !copied);
+  }
+
   // Loads a stop's current colour into the picker. The previous hue is kept for greys.
   function showInPicker(stop, from = null) {
     pickerHsv = hexToHsv(resolveStop(stop), pickerHsv.h);
@@ -1818,6 +1865,11 @@
       field.addEventListener("change", () => pickerStop() && renderPicker(pickerStop()));
       field.addEventListener("keydown", (e) => e.key === "Enter" && field.blur());
     }
+
+    // A mouse click leaves focus (and any half-typed text) in the field.
+    m.hexCopy.addEventListener("mousedown", (e) => e.preventDefault());
+    m.hexCopy.addEventListener("click", () => copyHex(m));
+    m.cleanups.push(() => clearTimeout(m.hexCopiedTimer));
 
     m.useThemeButton.addEventListener("click", () => {
       const stop = pickerStop();
@@ -2897,17 +2949,17 @@
     check(35, `Picker columns side by side (needs ≥ ${PICKER_COLUMNS_MIN} px of content)`, sideBySide,
       `content ${Math.round(contentWidth)} px, ${sideBySide ? "side by side" : cr.top >= sr.bottom ? "stacked" : "overlapping"}`);
     const pickerControls = {
-      "SV square": m.sv, "hue slider": m.hue, R: m.rgb[0], G: m.rgb[1], B: m.rgb[2], "hex field": m.hex,
+      "SV square": m.sv, "hue slider": m.hue, R: m.rgb[0], G: m.rgb[1], B: m.rgb[2], "hex field": m.hex, "hex copy button": m.hexCopy,
       "theme button": m.useThemeButton, ...(m.eyedropper ? { eyedropper: m.eyedropper } : {}),
     };
     const unreachable = Object.entries(pickerControls).filter(([, el]) => !reachable(el)).map(([name]) => name);
     check(35, "Every picker control is reachable (scrolled into view, its centre hit-tests to it)", !unreachable.length,
       unreachable.length ? `not reachable: ${unreachable.join(", ")}` : `${Object.keys(pickerControls).length} controls`);
-    const hexLabel = m.root.querySelector(".gpb-hex-row > span");
+    const hexLabel = m.root.querySelector(".gpb-hex-row > label");
     check(36, "Hex label reads 'HEX:'", hexLabel?.textContent === "HEX:", JSON.stringify(hexLabel?.textContent ?? null));
     const columnRect = controls.getBoundingClientRect();
-    const hexRect = m.hex.getBoundingClientRect();
-    check(36, "Hex field is at most 55 % of the right column's width", hexRect.width <= 0.55 * columnRect.width,
+    const hexRect = m.hexWrap.getBoundingClientRect(); // the field with its copy button (#56)
+    check(36, "Hex field (with its copy button) is at most 55 % of the right column's width", hexRect.width <= 0.55 * columnRect.width,
       `field ${Math.round(hexRect.width)} px, column ${Math.round(columnRect.width)} px`);
     const leftGap = hexLabel.getBoundingClientRect().left - columnRect.left;
     const rightGap = columnRect.right - hexRect.right;
@@ -3119,6 +3171,92 @@
       el.dispatchEvent(new MouseEvent("mouseup", init));
       el.dispatchEvent(new MouseEvent("click", init));
     };
+
+    // ── Hex copy button (#56) ──
+    const copyRect = m.hexCopy.getBoundingClientRect();
+    const wrapRect = m.hexWrap.getBoundingClientRect();
+    const hexStyle = getComputedStyle(m.hex);
+    const copySvg = m.hexCopy.querySelector("svg:not([hidden])");
+    const focusables = [...m.root.querySelectorAll("button, input, [tabindex]")].filter((el) => el.tabIndex >= 0 && !el.disabled && !el.hidden);
+    check(56, "The copy button sits inside the hex field's wrap at its right edge, about 24 × 24 px, with a 14 px icon; the text box ends before it; Tab order after the field",
+      m.hexWrap.contains(m.hexCopy) && m.hexWrap.contains(m.hex) && Math.abs(wrapRect.right - copyRect.right) <= 4 &&
+        copyRect.left >= wrapRect.left && Math.abs(copyRect.width - 24) <= 1 && Math.abs(copyRect.height - 24) <= 1 &&
+        Math.abs((copyRect.top + copyRect.bottom) / 2 - (wrapRect.top + wrapRect.bottom) / 2) <= 1 &&
+        parseFloat(hexStyle.paddingRight) >= copyRect.width && Math.abs(copySvg?.getBoundingClientRect().width - 14) <= 0.5 &&
+        m.hexCopy.getAttribute("aria-label") === HEX_COPY_LABEL && m.hexCopy.title === HEX_COPY_LABEL && m.hexCopy.type === "button" &&
+        focusables.indexOf(m.hexCopy) === focusables.indexOf(m.hex) + 1,
+      `button ${copyRect.width.toFixed(1)}×${copyRect.height.toFixed(1)}, ${(wrapRect.right - copyRect.right).toFixed(1)} px from the right; ` +
+        `padding-right ${hexStyle.paddingRight}; wrap ${wrapRect.width.toFixed(1)} px, field ${m.hex.getBoundingClientRect().width.toFixed(1)} px`);
+    const hexCopyRules = [...(m.root.querySelector("style")?.sheet?.cssRules ?? [])].filter((r) => r.selectorText);
+    const hexCopyHover = hexCopyRules.find((r) => /\.gpb-hex-copy:hover/.test(r.selectorText) && r.style.getPropertyValue("color").trim() === "var(--spice-text)");
+    const subtextProbe = document.createElement("span"); // the same computed form as the button colour
+    subtextProbe.style.color = "var(--spice-subtext)";
+    m.hexWrap.append(subtextProbe);
+    const subtextColour = getComputedStyle(subtextProbe).color;
+    subtextProbe.remove();
+    check(56, "The copy button is --spice-subtext at rest and --spice-text on hover (CSSOM), with a focus ring",
+      !!hexCopyHover && getComputedStyle(m.hexCopy).color === subtextColour &&
+        hexCopyRules.some((r) => /\.gpb-hex-copy:focus-visible/.test(r.selectorText) && /outline: 2px solid/.test(r.cssText)),
+      `rest ${getComputedStyle(m.hexCopy).color} (subtext ${subtextColour}); ${hexCopyHover ? `"${hexCopyHover.cssText}"` : "no hover rule"}`);
+    {
+      const realSources = { ...clipboardSources };
+      let copied = null;
+      let failing = false;
+      try {
+        clipboardSources.api = () => ({ copy: async (text) => {
+          if (failing) throw new Error("stub");
+          copied = text;
+        } });
+        clipboardSources.clipboard = () => ({ writeText: async () => { throw new Error("stub"); } });
+        clipboardSources.execCommand = () => !failing && false;
+        const iconShows = (name) => (name === "check") === !m.hexCopyCheck.hasAttribute("hidden") && (name === "check") === m.hexCopyIcon.hasAttribute("hidden");
+        const copyNode = m.hexCopy;
+        setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), theme("s3")]);
+        selectStop("s2");
+        const before = JSON.stringify(settings);
+        const dotNodes = dots();
+        realClick(copyNode);
+        await sleep(20);
+        const unchanged = () => JSON.stringify(settings) === before && selectionIs("s2") && dots().every((el, i) => el === dotNodes[i]) &&
+          dots().length === dotNodes.length && copyNode.isConnected;
+        check(56, "A click copies the selected stop's #rrggbb, shows the check and announces 'Hex code copied'; settings, selection and dots unchanged",
+          copied === GREEN && iconShows("check") && m.announce.textContent === "Hex code copied" && unchanged() && m.hex.value === GREEN,
+          `copied ${copied}, icon ${iconShows("check") ? "check" : "copy"}, announced "${m.announce.textContent}"`);
+        stillOpen("the hex copy button");
+        await sleep(HEX_COPIED_MS + 200);
+        check(56, `The copy icon is back after ${HEX_COPIED_MS / 1000} s`, iconShows("copy"), iconShows("copy") ? "copy icon" : "still the check");
+        copied = null;
+        selectStop("s3");
+        realClick(copyNode);
+        await sleep(20);
+        const themeHex = resolveStop(theme("s3"));
+        check(56, "On a theme stop it copies the resolved colour as #rrggbb, and the stop stays a theme stop",
+          copied === themeHex && /^#[0-9a-f]{6}$/.test(copied ?? "") && findStop("s3")?.kind === "theme",
+          `copied ${copied}, resolved ${themeHex}`);
+        selectStop("s1");
+        m.hex.focus({ preventScroll: true });
+        m.hex.value = "#12";
+        m.hex.dispatchEvent(new Event("input", { bubbles: true }));
+        copied = null;
+        const beforeInvalid = JSON.stringify(settings);
+        realClick(copyNode);
+        await sleep(20);
+        check(56, "While the field holds invalid text, it copies the last valid colour; the field keeps its text and focus",
+          copied === RED && m.hex.value === "#12" && document.activeElement === m.hex && JSON.stringify(settings) === beforeInvalid,
+          `copied ${copied}, field "${m.hex.value}", focus .${document.activeElement?.className}`);
+        m.hex.dispatchEvent(new Event("change", { bubbles: true }));
+        failing = true;
+        copyNode.focus({ preventScroll: true });
+        await copyHex(m);
+        check(56, "If every tier fails, the field's text is selected so Ctrl+C works",
+          document.activeElement === m.hex && m.hex.selectionStart === 0 && m.hex.selectionEnd === m.hex.value.length && m.hex.value === RED,
+          `focus .${document.activeElement?.className}, selected ${m.hex.selectionStart}–${m.hex.selectionEnd}`);
+        stillOpen("the hex copy button");
+      } finally {
+        Object.assign(clipboardSources, realSources);
+      }
+    }
+
     const resetBtn = m.resetButton;
     const isArmed = () => resetBtn.classList.contains("gpb-armed") && m.resetLabel.textContent === RESET_CONFIRM_LABEL;
     const isIdle = () => !resetBtn.classList.contains("gpb-armed") && m.resetLabel.textContent === "Reset";

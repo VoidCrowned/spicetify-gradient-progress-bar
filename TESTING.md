@@ -61,7 +61,8 @@ It covers:
 - Inline colour picker, driven with real pointer and keyboard events:
   - it sits between the dots and the action row, side by side when there's room;
   - every control is reachable (scrolled into view and hit-tested, so nothing is clipped);
-  - the `HEX:` row is centred with a half-width field;
+  - the `HEX:` row is centred with a half-width field (measured with its copy button);
+  - the hex copy button (#56): inside the field's wrap at its right edge, 24 × 24 px with a 14 px icon, the text ending before it, next in the Tab order; `--spice-subtext` at rest, `--spice-text` on hover (CSSOM), focus ring; with a stubbed clipboard it copies the selected stop's `#rrggbb` (also a theme stop's resolved colour, and the last valid colour while the field holds invalid text, which it keeps), shows the check and announces *Hex code copied*, the copy icon back after 1.5 s; settings, selection and dots unchanged; if every tier fails, the field's text is selected;
   - the square, hue bar, R/G/B and hex fields each update the colour, the dot (in place) and the bar;
   - invalid input is flagged and ignored;
   - *Use theme colour* works.
@@ -100,6 +101,7 @@ What needs a human (≤ 8 items):
    - Clicking a dot moves the ring and the picker follows.
    - Dragging in the square and hue bar feels smooth, also when you drag outside the settings.
    - The eyedropper (if shown) picks a colour from the screen without closing the settings.
+   - The hex copy icon sits neatly inside the field; clicking it shows a check, and pasting gives the hex code.
    - Right-click a dot → Duplicate / Remove.
    - Drag a dot → a marker shows where it lands and the order changes.
    - Tab to a dot, press Alt+→ → it moves and keeps focus; Spotify doesn't go back or forward.
