@@ -2,6 +2,16 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.6.0] — 2026-10-18
+
+### Changed
+- **Presets preview before they apply** ([#51](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/51)). The first click on a preset shows it in the strip in the settings window, and the chip asks *Apply?*; the second click applies it. Many themes hide or blur the player while the settings are open, so the strip is where you see what you're trying.
+  - Nothing else changes while previewing: not your settings, not the bar. There's no time limit; Escape or clicking elsewhere cancels, and clicking another preset previews that one instead.
+  - Every preset is two clicks now, even when your current colours are already a preset. Clicking the preset you're already on does nothing.
+  - A share code pasted into *Import* previews in the strip the same way until you press *Apply*.
+- **Export and Import look like buttons** ([#52](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/52)): outlined, with an icon. *Copy code* is now called **Export**; *Copied* appears beside it.
+- The help text at the bottom has one line per topic: editing, − and +, Reset ([#52](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/52)).
+
 ## [1.5.0] — 2026-10-18
 
 ### Added

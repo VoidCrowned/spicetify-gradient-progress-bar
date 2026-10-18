@@ -2,7 +2,7 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
-## v1.6.0 — planned
+## v1.6.0 — released 2026-10-18
 
 | # | Issue | Area | Status |
 |---|---|---|---|
@@ -124,7 +124,7 @@ Builds were handed over as `Test build <sha>` comments on #14 (closed with the r
 
 ## Next
 
-v1.6.0 (#51, #52) is next, see above. Other candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
+Nothing is planned after v1.6.0 yet. Candidates are in the [Future milestone](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestone/2). The Hazy retest [#38](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/38) passed on 17 Oct (using the Topbar workaround) and is closed; no release needed.
 
 ## Future
 
