@@ -12,7 +12,7 @@ A [Spicetify](https://spicetify.app) extension that recolours Spotify's song pro
 - **Three ways to spread a gradient** — *Compress* fits the whole gradient between the start and the playhead, *Anchored* keeps the colours fixed to the bar and reveals them as the song plays, *Slide* moves a full-length gradient in with the playhead.
 - **Up to 8 colours**, edited in a built-in colour picker with R/G/B and hex input, reorderable by drag-and-drop.
 - **Theme colour stop** — a colour that follows your theme's accent instead of a fixed value. With themes that change their accent per song (like Hazy's album-art mode), the bar follows along.
-- **Presets** — four built-in gradients (Sunset, Ocean, Aurora, Neon) and up to 12 of your own, one click away, with Undo.
+- **Presets** — five built-in gradients (Void, Sunset, Aurora, Neon, Fairy) in their own row, and up to 12 of your own below them, with a preview and Undo.
 - **Share codes** — copy your settings as a short code (`gpb1:…`) and paste someone else's to try it.
 - **Live preview** — changes show on the bar as you pick.
 - **Leaves everything else alone** — only the song progress bar changes; the volume slider, layout and your theme's other styling stay as they are. With default settings the extension changes nothing at all.

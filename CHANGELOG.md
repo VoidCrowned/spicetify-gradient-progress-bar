@@ -2,6 +2,11 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.6.1] — unreleased
+
+### Changed
+- **New built-in presets** ([#53](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/53)): Void, Sunset, Aurora, Neon and Fairy, in their own row. Your own presets and **+ Save** are in the row below. Ocean is gone, and Sunset and Neon have new colours. If one of your own presets has the same name as a built-in, it's shown as "Name (2)".
+
 ## [1.6.0] — 2026-10-18
 
 ### Changed

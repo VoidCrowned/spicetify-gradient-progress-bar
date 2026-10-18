@@ -147,12 +147,14 @@
   const CODE_PREFIX = "gpb1:"; // the code's format version; a future schema bumps it
   const MODE_CODES = { compress: "c", anchored: "a", slide: "s" };
 
-  // Colours only: applying one keeps the current Spread mode. They can't be renamed or deleted.
+  // Colours only, all fixed (no theme stops): applying one keeps the current Spread mode. They
+  // can't be renamed or deleted, and they have their own chip row (#53).
   const BUILT_IN_PRESETS = [
-    { id: "b:sunset", name: "Sunset", colours: ["#ff5f6d", "#ffc371"] },
-    { id: "b:ocean", name: "Ocean", colours: ["#2193b0", "#6dd5ed"] },
+    { id: "b:void", name: "Void", colours: ["#8372fd", "#5a82ff", "#8372fd"] },
+    { id: "b:sunset", name: "Sunset", colours: ["#6e33ff", "#ff5f6d", "#ffc371"] },
     { id: "b:aurora", name: "Aurora", colours: ["#00f5a0", "#00d9f5", "#7f5af0"] },
-    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff"] },
+    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff", "#33f7ff"] },
+    { id: "b:fairy", name: "Fairy", colours: ["#ff59d1", "#ffb800", "#77bc00"] },
   ].map((preset) => ({ ...preset, builtIn: true }));
 
   let presets = []; // own presets: [{ id, name, settings: { gradient, mode, stops } }]
@@ -629,7 +631,8 @@
 .gpb-text-button:hover:not(:disabled) { background-color: rgba(var(--spice-rgb-text), .1); color: var(--spice-text); }
 .gpb-text-button:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 1px; }
 .gpb-sizer { visibility: hidden; }
-.gpb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gpb-chips { display: flex; flex-direction: column; gap: 8px; }
+.gpb-chip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .gpb-chip { display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box; height: 28px; padding: 0 12px 0 7px; border: 1px solid rgba(var(--spice-rgb-text), .3); border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .8125rem; cursor: pointer; }
 .gpb-chip:hover:not(:disabled) { border-color: var(--spice-text); }
 .gpb-chip[aria-pressed="true"], .gpb-chip[aria-pressed="true"]:hover:not(:disabled), .gpb-chip.gpb-armed, .gpb-chip.gpb-armed:hover:not(:disabled) { border-color: var(--spice-button); }
@@ -733,8 +736,11 @@
           </div>
         </div>
         <div class="gpb-chips" role="group" aria-labelledby="gpb-presets-label">
-          <button type="button" class="gpb-chip gpb-save-chip">+ Save</button>
-          <input type="text" class="gpb-field gpb-name-field" maxlength="${PRESET_NAME_MAX}" spellcheck="false" autocomplete="off" aria-label="Preset name" hidden>
+          <div class="gpb-chip-row gpb-built-in-row"></div>
+          <div class="gpb-chip-row gpb-own-row">
+            <button type="button" class="gpb-chip gpb-save-chip">+ Save</button>
+            <input type="text" class="gpb-field gpb-name-field" maxlength="${PRESET_NAME_MAX}" spellcheck="false" autocomplete="off" aria-label="Preset name" hidden>
+          </div>
         </div>
         <input type="text" class="gpb-field gpb-code-output" readonly spellcheck="false" aria-label="Share code (copy it from here)" hidden>
         <div class="gpb-import-panel" id="gpb-import-panel" hidden>
@@ -787,6 +793,8 @@
       presets: root.querySelector(".gpb-presets"),
       presetsRow: root.querySelector(".gpb-presets-row"),
       chips: root.querySelector(".gpb-chips"),
+      builtInRow: root.querySelector(".gpb-built-in-row"),
+      ownRow: root.querySelector(".gpb-own-row"),
       saveChip: root.querySelector(".gpb-save-chip"),
       nameField: root.querySelector(".gpb-name-field"),
       exportButton: root.querySelector(".gpb-export"),
@@ -1016,7 +1024,7 @@
   }
 
   // ── Presets row (#21) ──
-  // Chips for the built-ins, then own presets, then + Save. Applying is always two-step: the
+  // Two chip rows (#53): the built-ins, then own presets and + Save. Applying is always two-step: the
   // first click arms the chip ("Apply?"; hidden sizers keep its width) and previews it in the
   // strip, the second applies (#51). Themes often hide the player behind the popup, so the strip
   // is the preview, not the bar. No timeout while armed; the active chip does nothing. Undo for
@@ -1298,7 +1306,8 @@
     disarmChip(m);
     if (!m.naming) m.saveChip.after(m.nameField);
     for (const chip of m.chips.querySelectorAll(".gpb-preset-chip")) chip.remove();
-    for (const preset of [...BUILT_IN_PRESETS, ...presets]) m.saveChip.before(presetChip(preset));
+    m.builtInRow.append(...BUILT_IN_PRESETS.map(presetChip)); // row 1: the built-ins only (#53)
+    for (const preset of presets) m.saveChip.before(presetChip(preset)); // row 2: own presets, then + Save
     const full = presets.length >= MAX_PRESETS;
     m.saveChip.disabled = full;
     m.saveChip.title = full ? SAVE_FULL_LABEL : SAVE_LABEL;
@@ -3204,21 +3213,45 @@
       loadPresets(presetsJson(Array.from({ length: MAX_PRESETS + 2 }, (_, i) => own(`p${i + 1}`, `Mine ${i + 1}`, sampleB))))
     );
     presets = [own("p1", "Mine", sampleB)];
-    const clashes = [uniqueName("Mine"), uniqueName("ocean"), uniqueName(" Spaced "), uniqueName("y".repeat(30))];
+    const clashes = [uniqueName("Mine"), uniqueName("fairy"), uniqueName(" Spaced "), uniqueName("y".repeat(30))];
     presets = [own("p1", "y".repeat(PRESET_NAME_MAX), sampleB)];
     const longClash = uniqueName("y".repeat(PRESET_NAME_MAX));
     check(21, `At most ${MAX_PRESETS} presets load; names are unique (built-ins included, any case), trimmed and ≤ ${PRESET_NAME_MAX} characters`,
       capped.length === MAX_PRESETS && capWarnings === 1 &&
-        clashes.join("|") === `Mine (2)|ocean (2)|Spaced|${"y".repeat(PRESET_NAME_MAX)}` &&
+        clashes.join("|") === `Mine (2)|fairy (2)|Spaced|${"y".repeat(PRESET_NAME_MAX)}` &&
         longClash.length === PRESET_NAME_MAX && longClash.endsWith(" (2)"),
       `${capped.length} loaded, ${capWarnings} warning(s); ${clashes.join(" | ")} | ${longClash}`);
     presets = [];
     savePresets();
     const builtInsBefore = BUILT_IN_PRESETS.map((p) => p.id).join();
     check(21, "Built-ins can't be deleted, renamed or updated",
-      deletePreset("b:ocean") === null && !renamePreset("b:ocean", "Sea") && !updatePreset("b:ocean") &&
-        BUILT_IN_PRESETS.map((p) => p.id).join() === builtInsBefore && BUILT_IN_PRESETS[1].name === "Ocean",
+      deletePreset("b:fairy") === null && !renamePreset("b:fairy", "Sea") && !updatePreset("b:fairy") &&
+        BUILT_IN_PRESETS.map((p) => p.id).join() === builtInsBefore && BUILT_IN_PRESETS[4].name === "Fairy",
       builtInsBefore);
+    // The maintainer's set (#53), as share codes: names, order and colours, all fixed.
+    const expectedBuiltIns = [
+      ["b:void", "Void", "gpb1:eyJnIjoxLCJtIjoiYyIsInMiOlsiODM3MmZkIiwiNWE4MmZmIiwiODM3MmZkIl19"],
+      ["b:sunset", "Sunset", "gpb1:eyJnIjoxLCJtIjoiYyIsInMiOlsiNmUzM2ZmIiwiZmY1ZjZkIiwiZmZjMzcxIl19"],
+      ["b:aurora", "Aurora", "gpb1:eyJnIjoxLCJtIjoiYyIsInMiOlsiMDBmNWEwIiwiMDBkOWY1IiwiN2Y1YWYwIl19"],
+      ["b:neon", "Neon", "gpb1:eyJnIjoxLCJtIjoiYyIsInMiOlsiZmYwMGNjIiwiMzMzM2ZmIiwiMzNmN2ZmIl19"],
+      ["b:fairy", "Fairy", "gpb1:eyJnIjoxLCJtIjoiYyIsInMiOlsiZmY1OWQxIiwiZmZiODAwIiwiNzdiYzAwIl19"],
+    ];
+    const builtInMismatches = expectedBuiltIns.filter(([id, name, code], i) => {
+      const preset = BUILT_IN_PRESETS[i];
+      const applied = preset && presetSettings(preset, { mode: "compress" });
+      const decoded = decodeCode(code);
+      return !preset || preset.id !== id || preset.name !== name || encodeCode(applied) !== code ||
+        !decoded || !sameSettings(decoded, applied) || applied.stops.some((stop) => stop.kind !== "custom");
+    }).map(([id]) => id);
+    check(53, "The built-ins are exactly Void, Sunset, Aurora, Neon, Fairy (in order, fixed colours); each encodes to and decodes from its code",
+      BUILT_IN_PRESETS.length === expectedBuiltIns.length && !builtInMismatches.length,
+      builtInMismatches.length ? `mismatch: ${builtInMismatches.join(", ")}` : BUILT_IN_PRESETS.map((p) => `${p.name} ${p.colours.join("→")}`).join("; "));
+    const [renamedOnLoad, renameWarnings] = gpbWarnings(() =>
+      loadPresets(presetsJson([own("p3", "fairy", sampleB), own("p1", "Void", sampleA), own("p2", "Ocean", sampleB)]))
+    );
+    check(53, "Stored own presets whose names clash with a built-in are renamed on load (' (2)'), ids unchanged, no warning",
+      names(renamedOnLoad) === "fairy (2), Void (2), Ocean" && renamedOnLoad.map((p) => p.id).join() === "p3,p1,p2" && !renameWarnings,
+      `${names(renamedOnLoad)}; ids ${renamedOnLoad.map((p) => p.id).join()}; ${renameWarnings} warning(s)`);
 
     // Share codes: round-trip and rejection, all through validateSettings().
     const codeCases = MODES.flatMap((mode) => [true, false].map((gradient) =>
@@ -3299,10 +3332,18 @@
     const swatchProbe = document.createElement("span"); // the same serialisation as the chip's inline style
     swatchProbe.style.backgroundImage = fillImage(presetSettings(BUILT_IN_PRESETS[2]));
     check(21, "Chips: the built-ins first, then own presets, + Save last; 12 px swatches painted with fillImage()",
-      chipIds() === "b:sunset,b:ocean,b:aurora,b:neon,save" && swatchRect && Math.abs(swatchRect.width - 12) <= 0.5 &&
+      chipIds() === "b:void,b:sunset,b:aurora,b:neon,b:fairy,save" && swatchRect && Math.abs(swatchRect.width - 12) <= 0.5 &&
         Math.abs(swatchRect.height - 12) <= 0.5 && getComputedStyle(chipSwatch).borderRadius === "50%" &&
         chipSwatch.style.backgroundImage === swatchProbe.style.backgroundImage,
       `${chipIds()}; swatch ${swatchRect?.width.toFixed(1)}×${swatchRect?.height.toFixed(1)}, ${chipSwatch?.style.backgroundImage}`);
+    // Two rows (#53): the built-ins alone, then own presets and + Save (always there).
+    const rowIds = (row) => [...row.querySelectorAll(".gpb-chip")].filter((el) => !el.hidden)
+      .map((el) => (el === m.saveChip ? "save" : el.dataset.preset)).join();
+    const rowsSplit = (own) => rowIds(m.builtInRow) === BUILT_IN_PRESETS.map((p) => p.id).join() && rowIds(m.ownRow) === [...own, "save"].join() &&
+      m.builtInRow.parentElement === m.chips && m.ownRow.parentElement === m.chips && m.builtInRow.nextElementSibling === m.ownRow;
+    const rowGap = m.ownRow.getBoundingClientRect().top - m.builtInRow.getBoundingClientRect().bottom;
+    check(53, "Row 1 holds only the built-ins; row 2 holds just + Save with no own presets; about 8 px between the rows",
+      rowsSplit([]) && Math.abs(rowGap - 8) <= 1, `row 1 ${rowIds(m.builtInRow)}; row 2 ${rowIds(m.ownRow)}; gap ${rowGap.toFixed(1)} px`);
 
     // Two-step apply with a preview in the strip (#51): always two clicks, no timeout.
     setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
@@ -3316,36 +3357,36 @@
     const statusText = () => m.undoText.textContent;
     const previewMessage = (name) => `Previewing "${name}" — click it again to apply, Esc to cancel`;
     const untouched = () => JSON.stringify(settings) === notAPreset && styleText() === cssBeforePreview;
-    const ocean = chipOf("b:ocean");
-    const oceanLabel = () => ocean.querySelector(".gpb-chip-label").textContent;
-    const idleChipWidth = ocean.getBoundingClientRect().width;
+    const fairy = chipOf("b:fairy");
+    const fairyLabel = () => fairy.querySelector(".gpb-chip-label").textContent;
+    const idleChipWidth = fairy.getBoundingClientRect().width;
     const dotNodes = dots();
     const hexBefore = m.hex.value;
-    realClick(ocean);
-    const armedChipWidth = ocean.getBoundingClientRect().width;
+    realClick(fairy);
+    const armedChipWidth = fairy.getBoundingClientRect().width;
     check(51, "First click on a chip arms it ('Apply?', width ±1 px) and previews it in the strip; settings, #gpb-style, dots and picker unchanged",
-      ocean.classList.contains("gpb-armed") && oceanLabel() === APPLY_LABEL && Math.abs(armedChipWidth - idleChipWidth) <= 1 &&
-        stripShows(presetSettings(BUILT_IN_PRESETS[1])) && untouched() &&
+      fairy.classList.contains("gpb-armed") && fairyLabel() === APPLY_LABEL && Math.abs(armedChipWidth - idleChipWidth) <= 1 &&
+        stripShows(presetSettings(BUILT_IN_PRESETS[4])) && untouched() &&
         dots().every((el, i) => el === dotNodes[i]) && dots().length === dotNodes.length && m.hex.value === hexBefore,
-      `label "${oceanLabel()}", width ${idleChipWidth.toFixed(1)} → ${armedChipWidth.toFixed(1)} px; strip ${m.preview.style.backgroundImage}`);
-    check(51, "While previewing, the status line (polite live region) reads 'Previewing \"Ocean\" — click it again to apply, Esc to cancel'",
-      statusText() === previewMessage("Ocean") && m.undoButton.hidden && m.undoLine.getAttribute("aria-live") === "polite",
+      `label "${fairyLabel()}", width ${idleChipWidth.toFixed(1)} → ${armedChipWidth.toFixed(1)} px; strip ${m.preview.style.backgroundImage}`);
+    check(51, "While previewing, the status line (polite live region) reads 'Previewing \"Fairy\" — click it again to apply, Esc to cancel'",
+      statusText() === previewMessage("Fairy") && m.undoButton.hidden && m.undoLine.getAttribute("aria-live") === "polite",
       `"${statusText()}"`);
     stillOpen("arming a preset chip");
-    press(ocean, "Escape");
+    press(fairy, "Escape");
     check(51, "Escape disarms the chip: the strip shows the current settings again, the status line is empty, nothing applied",
-      !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" && stripShows(settings) && !statusText() && untouched(),
-      `label "${oceanLabel()}", status "${statusText()}"`);
+      !fairy.classList.contains("gpb-armed") && fairyLabel() === "Fairy" && stripShows(settings) && !statusText() && untouched(),
+      `label "${fairyLabel()}", status "${statusText()}"`);
     stillOpen("Escape on an armed chip");
-    realClick(ocean);
+    realClick(fairy);
     await sleep(RESET_CONFIRM_MS + 500);
     check(51, `No timeout while previewing: still armed and previewing after ${(RESET_CONFIRM_MS + 500) / 1000} s`,
-      ocean.classList.contains("gpb-armed") && stripShows(presetSettings(BUILT_IN_PRESETS[1])) && statusText() === previewMessage("Ocean") && untouched(),
-      `label "${oceanLabel()}", status "${statusText()}"`);
+      fairy.classList.contains("gpb-armed") && stripShows(presetSettings(BUILT_IN_PRESETS[4])) && statusText() === previewMessage("Fairy") && untouched(),
+      `label "${fairyLabel()}", status "${statusText()}"`);
     const aurora = chipOf("b:aurora");
     realClick(aurora);
     check(51, "A click on another chip moves the arm and the preview to it in one click",
-      !ocean.classList.contains("gpb-armed") && oceanLabel() === "Ocean" && aurora.classList.contains("gpb-armed") &&
+      !fairy.classList.contains("gpb-armed") && fairyLabel() === "Fairy" && aurora.classList.contains("gpb-armed") &&
         stripShows(presetSettings(BUILT_IN_PRESETS[2])) && statusText() === previewMessage("Aurora") && untouched(),
       `armed ${m.armed?.chip.dataset.preset}, status "${statusText()}"`);
     stillOpen("moving the arm to another chip");
@@ -3355,49 +3396,49 @@
       `status "${statusText()}"`);
     stillOpen("a click outside an armed chip");
     selectStop("s2");
-    realClick(ocean);
-    realClick(ocean);
+    realClick(fairy);
+    realClick(fairy);
     const appliedOpen = m.root.isConnected && modal === m;
-    check(21, "Second click applies Ocean: its colours, gradient on, the mode kept (Anchored), the first dot selected; same chip node",
-      appliedOpen && sameSettings(settings, presetSettings(BUILT_IN_PRESETS[1])) && settings.mode === "anchored" &&
-        selectionIs(settings.stops[0].id) && chipOf("b:ocean") === ocean && ocean.isConnected,
+    check(21, "Second click applies Fairy: its colours, gradient on, the mode kept (Anchored), the first dot selected; same chip node",
+      appliedOpen && sameSettings(settings, presetSettings(BUILT_IN_PRESETS[4])) && settings.mode === "anchored" &&
+        selectionIs(settings.stops[0].id) && chipOf("b:fairy") === fairy && fairy.isConnected,
       `${settings.mode}, ${settings.stops.map((s) => s.color).join(", ")}; ${selection()}`);
     check(51, "After applying, the strip and #gpb-style show the applied settings",
-      stripShows(settings) && styleText() === buildCss(settings) && !ocean.classList.contains("gpb-armed"), m.preview.style.backgroundImage);
+      stripShows(settings) && styleText() === buildCss(settings) && !fairy.classList.contains("gpb-armed"), m.preview.style.backgroundImage);
     stillOpen("applying a preset");
     const buttonColour = computedRgb(m.root, "var(--spice-button)");
-    const oceanBorder = parseRgb(getComputedStyle(ocean).borderTopColor);
-    check(21, "The active chip is marked: aria-pressed on Ocean only, with a --spice-button border",
-      pressed() === "b:ocean" && !!oceanBorder && !!buttonColour && oceanBorder.slice(0, 3).every((v, i) => Math.abs(v - buttonColour[i]) <= 1),
-      `pressed ${pressed()}, border ${getComputedStyle(ocean).borderTopColor}`);
-    check(21, "Undo line after applying: 'Applied \"Ocean\" · Undo' in a polite live region", undoShows('Applied "Ocean"'), undoState());
-    const oceanApplied = JSON.stringify(settings);
-    realClick(ocean);
+    const fairyBorder = parseRgb(getComputedStyle(fairy).borderTopColor);
+    check(21, "The active chip is marked: aria-pressed on Fairy only, with a --spice-button border",
+      pressed() === "b:fairy" && !!fairyBorder && !!buttonColour && fairyBorder.slice(0, 3).every((v, i) => Math.abs(v - buttonColour[i]) <= 1),
+      `pressed ${pressed()}, border ${getComputedStyle(fairy).borderTopColor}`);
+    check(21, "Undo line after applying: 'Applied \"Fairy\" · Undo' in a polite live region", undoShows('Applied "Fairy"'), undoState());
+    const fairyApplied = JSON.stringify(settings);
+    realClick(fairy);
     check(51, "A click on the active chip does nothing: not armed, nothing applied, the Undo kept",
-      !ocean.classList.contains("gpb-armed") && !m.armed && JSON.stringify(settings) === oceanApplied && undoShows('Applied "Ocean"'),
+      !fairy.classList.contains("gpb-armed") && !m.armed && JSON.stringify(settings) === fairyApplied && undoShows('Applied "Fairy"'),
       `armed ${!!m.armed}, ${undoState()}`);
 
     const sunset = chipOf("b:sunset");
     realClick(sunset);
-    const sunsetPreview = statusText() === previewMessage("Sunset") && m.undoButton.hidden && JSON.stringify(settings) === oceanApplied;
+    const sunsetPreview = statusText() === previewMessage("Sunset") && m.undoButton.hidden && JSON.stringify(settings) === fairyApplied;
     press(sunset, "Escape");
     check(51, "Two clicks even when the current settings are a preset; disarming shows the still-running Undo again",
-      sunsetPreview && undoShows('Applied "Ocean"') && JSON.stringify(settings) === oceanApplied, `previewed ${sunsetPreview}; ${undoState()}`);
+      sunsetPreview && undoShows('Applied "Fairy"') && JSON.stringify(settings) === fairyApplied, `previewed ${sunsetPreview}; ${undoState()}`);
     realClick(sunset);
     realClick(sunset);
-    const sunsetApplied = sameSettings(settings, presetSettings(BUILT_IN_PRESETS[0])) && pressed() === "b:sunset";
-    const oceanState = presetSettings(BUILT_IN_PRESETS[1]);
+    const sunsetApplied = sameSettings(settings, presetSettings(BUILT_IN_PRESETS[1])) && pressed() === "b:sunset";
+    const fairyState = presetSettings(BUILT_IN_PRESETS[4]);
     realClick(m.undoButton);
-    check(21, "A new action replaces the pending undo: Undo goes back to Ocean, not further",
-      sunsetApplied && sameSettings(settings, oceanState) && selectionIs(settings.stops[0].id) && m.undoButton.hidden && !m.undoText.textContent,
+    check(21, "A new action replaces the pending undo: Undo goes back to Fairy, not further",
+      sunsetApplied && sameSettings(settings, fairyState) && selectionIs(settings.stops[0].id) && m.undoButton.hidden && !m.undoText.textContent,
       `${settings.stops.map((s) => s.color).join(", ")}; ${undoState()}`);
     stillOpen("Undo after applying");
 
     setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s3", GREEN)], "slide");
     selectStop("s3");
     const exact = JSON.stringify(settings);
-    realClick(ocean);
-    realClick(ocean);
+    realClick(fairy);
+    realClick(fairy);
     realClick(m.undoButton);
     check(21, "Undo after applying restores exactly the previous settings (ids included), the selection on the first dot",
       JSON.stringify(settings) === exact && selectedId === "s1" && selectionIs("s1"), `${JSON.stringify(settings)}; ${selection()}`);
@@ -3441,10 +3482,12 @@
     const storedPresets = JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY) ?? "{}").presets ?? [];
     check(21, "Enter saves the current settings as 'Mine' (stored), its chip appears after the built-ins, active and focused",
       presets.length === 1 && presets[0].name === "Mine" && sameSettings(presetSettings(presets[0]), settings) &&
-        storedPresets[0]?.name === "Mine" && chipIds() === `b:sunset,b:ocean,b:aurora,b:neon,${mineId},save` &&
+        storedPresets[0]?.name === "Mine" && chipIds() === `b:void,b:sunset,b:aurora,b:neon,b:fairy,${mineId},save` &&
         mineChip?.getAttribute("aria-pressed") === "true" && document.activeElement === mineChip && m.saveChip === saveNode,
       `${chipIds()}; pressed ${pressed()}; focus ${document.activeElement?.dataset?.preset ?? document.activeElement?.className}`);
     stillOpen("saving a preset");
+    check(53, "With an own preset, row 1 still holds only the built-ins and row 2 holds the own chip, then + Save",
+      rowsSplit([mineId]), `row 1 ${rowIds(m.builtInRow)}; row 2 ${rowIds(m.ownRow)}`);
 
     setTestSettings(true, [custom("s1", GREEN), custom("s2", BLUE)], "compress");
     realClick(chipOf(mineId));
@@ -3453,7 +3496,7 @@
       sameSettings(settings, { gradient: true, mode: "slide", stops: [theme("x"), custom("y", RED)] }), JSON.stringify(settings));
     stillOpen("applying an own preset");
 
-    rightClick(chipOf("b:ocean"));
+    rightClick(chipOf("b:fairy"));
     const builtInMenu = menuShown();
     closePopover();
     rightClick(chipOf(mineId));
@@ -3466,12 +3509,12 @@
     realClick(renameNode);
     const renaming = !m.nameField.hidden && m.nameField.value === "Mine" && chipOf(mineId)?.hidden &&
       m.nameField.nextElementSibling === chipOf(mineId) && renameNode.isConnected && !menuShown();
-    m.nameField.value = "Ocean";
+    m.nameField.value = "Fairy";
     press(m.nameField, "Enter");
     await tick();
     await tick();
     check(21, "Rename: an inline field in the chip's place; a clash with a built-in gets ' (2)'; the menu item stays connected",
-      renaming && presets[0].name === "Ocean (2)" && chipOf(mineId)?.textContent.includes("Ocean (2)") && !chipOf(mineId)?.hidden,
+      renaming && presets[0].name === "Fairy (2)" && chipOf(mineId)?.textContent.includes("Fairy (2)") && !chipOf(mineId)?.hidden,
       `field shown in place ${renaming}; name "${presets[0].name}"`);
     stillOpen("renaming a preset");
     setTestSettings(true, [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)], "compress");
@@ -3501,9 +3544,9 @@
     realClick(deleteNode);
     await tick();
     await tick();
-    check(21, "Delete removes the preset at once (storage too); 'Deleted \"Ocean (2)\" · Undo'; the menu item stays connected",
-      presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(PRESETS_KEY).includes('"Ocean (2)"') &&
-        undoShows('Deleted "Ocean (2)"') && deleteNode.isConnected,
+    check(21, "Delete removes the preset at once (storage too); 'Deleted \"Fairy (2)\" · Undo'; the menu item stays connected",
+      presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(PRESETS_KEY).includes('"Fairy (2)"') &&
+        undoShows('Deleted "Fairy (2)"') && deleteNode.isConnected,
       `${names(presets)}; ${undoState()}`);
     stillOpen("deleting a preset");
     realClick(m.undoButton);
@@ -3511,7 +3554,7 @@
     await tick();
     check(21, "Undo after Delete restores the preset in its old place, in storage too",
       JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(PRESETS_KEY) === presetsJson(JSON.parse(beforeDelete)) &&
-        chipIds().startsWith(`b:sunset,b:ocean,b:aurora,b:neon,${mineId},`),
+        chipIds().startsWith(`b:void,b:sunset,b:aurora,b:neon,b:fairy,${mineId},`),
       `${names(presets)}; ${chipIds()}`);
     stillOpen("Undo after deleting");
 
