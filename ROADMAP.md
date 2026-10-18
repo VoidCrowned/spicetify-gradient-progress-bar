@@ -145,6 +145,7 @@ Agreed ideas, not scheduled.
 | [#19](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/19) | Hover behaviour option | |
 | [#20](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/20) | Optional styling for the track and the volume bar | opt-in only |
 | [#22](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/22) | Handle colour = colour at current position | builds on Anchored (#15, v1.2.0) |
+| [#57](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/57) | Status: the entry text keeps "hidden while Spicetify's MenuItem is broken" after MenuItem is fixed | diagnostic text only; with the next release |
 
 ## Not planned
 
