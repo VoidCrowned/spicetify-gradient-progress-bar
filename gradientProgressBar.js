@@ -145,6 +145,8 @@
   const MAX_PRESETS = 12;
   const PRESET_NAME_MAX = 24;
   const CODE_PREFIX = "gpb1:"; // the code's format version; a future schema bumps it
+  const GCB_CODE_PREFIX = "gcb1:"; // Gradient Connect Bar's codes import too (#59)
+  const GCB_TEXT_CODES = ["a", "b", "w", "d"]; // GCB's text colours: checked as GCB checks them, then dropped
   const MODE_CODES = { compress: "c", anchored: "a", slide: "s" };
 
   // Colours only, all fixed (no theme stops): applying one keeps the current Spread mode. They
@@ -292,11 +294,14 @@
   }
 
   // Settings from a share code (stop ids s1…sN), checked by validateSettings(), or null.
-  // Surrounding whitespace is fine; an unknown prefix or version isn't.
-  function decodeCode(text) {
+  // Surrounding whitespace is fine; an unknown prefix or version isn't. Gradient Connect Bar's
+  // gcb1: codes (#59) are decoded exactly as GCB does — { g, x, s }, x its text colour, which must
+  // be valid — then x is dropped and `current`'s Spread mode kept.
+  function decodeCode(text, current = settings) {
     const code = String(text ?? "").trim();
-    const body = code.slice(CODE_PREFIX.length);
-    if (!code.startsWith(CODE_PREFIX) || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
+    const prefix = [CODE_PREFIX, GCB_CODE_PREFIX].find((candidate) => code.startsWith(candidate));
+    const body = prefix ? code.slice(prefix.length) : "";
+    if (!prefix || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
     let data = null;
     try {
       data = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
@@ -304,8 +309,10 @@
       return null;
     }
     if (!data || typeof data !== "object" || !Array.isArray(data.s)) return null;
+    const fromGcb = prefix === GCB_CODE_PREFIX;
+    if (fromGcb && !GCB_TEXT_CODES.includes(data.x)) return null;
     // Anything unexpected is passed on as a value validateSettings() rejects.
-    const mode = Object.keys(MODE_CODES).find((key) => MODE_CODES[key] === data.m) ?? null;
+    const mode = fromGcb ? current.mode : Object.keys(MODE_CODES).find((key) => MODE_CODES[key] === data.m) ?? null;
     return validateSettings({
       version: SCHEMA_VERSION,
       gradient: data.g === 1 ? true : data.g === 0 ? false : null,
@@ -760,7 +767,7 @@
         </div>
         <div class="gpb-import-panel" id="gpb-import-panel" hidden>
           <div class="gpb-import-row">
-            <input type="text" class="gpb-field gpb-code-input" spellcheck="false" autocomplete="off" placeholder="gpb1:…" aria-label="Paste a share code" aria-describedby="gpb-import-error">
+            <input type="text" class="gpb-field gpb-code-input" spellcheck="false" autocomplete="off" placeholder="gpb1:… or gcb1:…" aria-label="Paste a share code" aria-describedby="gpb-import-error">
             <button type="button" class="gpb-button gpb-import-apply">Apply</button>
           </div>
           <p class="gpb-import-error" id="gpb-import-error" aria-live="polite"></p>
@@ -1284,9 +1291,10 @@
       setImportError(m, true);
       return false;
     }
+    const fromGcb = m.codeInput.value.trim().startsWith(GCB_CODE_PREFIX); // #59
     toggleImport(m, false);
     m.importButton.focus({ preventScroll: true });
-    applySettings(next, "Imported code", m.importButton);
+    applySettings(next, fromGcb ? "Imported code from Gradient Connect Bar" : "Imported code", m.importButton);
     return true;
   }
 
@@ -3723,6 +3731,45 @@
       accepted.length ? `accepted: ${accepted.join(", ")}` : `${Object.keys(invalidCodes).length} rejected`);
     check(21, "Whitespace around a code is accepted", !!decodeCode(`  \n${threeColours}\t `), "");
 
+    // Gradient Connect Bar's codes (#59). The fixtures are shared with GCB's self-test (GCB #36).
+    const FIXTURES = {
+      gpbVoid: "gpb1:eyJnIjoxLCJtIjoiYyIsInMiOlsiODM3MmZkIiwiNWE4MmZmIiwiODM3MmZkIl19",
+      gpbThemeAnchored: "gpb1:eyJnIjoxLCJtIjoiYSIsInMiOlsidCIsImZmNWY2ZCJdfQ",
+      gcbVoidAuto: "gcb1:eyJnIjoxLCJ4IjoiYSIsInMiOlsiODM3MmZkIiwiNWE4MmZmIiwiODM3MmZkIl19",
+      gcbThemeWhite: "gcb1:eyJnIjoxLCJ4IjoidyIsInMiOlsidCIsImZmNWY2ZCJdfQ",
+      gcbSolidThemeDefault: "gcb1:eyJnIjowLCJ4IjoiZCIsInMiOlsidCJdfQ",
+    };
+    const shapeOf = (decoded) => decoded
+      ? `g ${decoded.gradient ? 1 : 0}, ${decoded.mode}, ${decoded.stops.map((stop) => (stop.kind === "theme" ? "t" : stop.color)).join("→")}`
+      : "null";
+    const fixtureResults = {
+      gpbVoid: [shapeOf(decodeCode(FIXTURES.gpbVoid, { mode: "slide" })), "g 1, compress, #8372fd→#5a82ff→#8372fd"],
+      gpbThemeAnchored: [shapeOf(decodeCode(FIXTURES.gpbThemeAnchored, { mode: "slide" })), "g 1, anchored, t→#ff5f6d"],
+      gcbVoidAuto: [shapeOf(decodeCode(FIXTURES.gcbVoidAuto, { mode: "anchored" })), "g 1, anchored, #8372fd→#5a82ff→#8372fd"],
+      gcbVoidAutoSlide: [shapeOf(decodeCode(FIXTURES.gcbVoidAuto, { mode: "slide" })), "g 1, slide, #8372fd→#5a82ff→#8372fd"],
+      gcbThemeWhite: [shapeOf(decodeCode(FIXTURES.gcbThemeWhite, { mode: "compress" })), "g 1, compress, t→#ff5f6d"],
+      gcbSolidThemeDefault: [shapeOf(decodeCode(FIXTURES.gcbSolidThemeDefault, { mode: "anchored" })), "g 0, anchored, t"],
+    };
+    const wrongFixtures = Object.entries(fixtureResults).filter(([, [got, want]]) => got !== want);
+    check(59, "Fixtures decode as specified: gpb1: brings its mode; gcb1: brings colours and gradient, keeps the current mode (text colour dropped)",
+      !wrongFixtures.length && sameSettings(decodeCode(FIXTURES.gpbVoid), presetSettings(BUILT_IN_PRESETS[0], { mode: "compress" })),
+      wrongFixtures.map(([k, [got, want]]) => `${k}: ${got} (expected ${want})`).join("; ") || `${Object.keys(fixtureResults).length} decodes`);
+    const gcbCode = (data) => GCB_CODE_PREFIX + btoa(JSON.stringify(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const invalidGcbCodes = {
+      "unknown x": gcbCode({ g: 1, x: "q", s: ["ff0000"] }),
+      "no x": gcbCode({ g: 1, s: ["ff0000"] }),
+      "m instead of x": gcbCode({ g: 1, m: "c", s: ["ff0000"] }),
+      "9 stops": gcbCode({ g: 1, x: "a", s: Array(9).fill("ff0000") }),
+      "bad hex": gcbCode({ g: 1, x: "a", s: ["zzzzzz"] }),
+      "g 2": gcbCode({ g: 2, x: "a", s: ["ff0000"] }),
+      "gcb2:": `gcb2:${FIXTURES.gcbVoidAuto.slice(5)}`,
+      "prefix only": GCB_CODE_PREFIX,
+    };
+    const acceptedGcb = Object.entries(invalidGcbCodes).filter(([, code]) => decodeCode(code) !== null).map(([name]) => name);
+    check(59, "Invalid gcb1: codes are rejected, as GCB rejects them: an unknown or missing x, 9 stops, a bad hex, g 2, gcb2:",
+      !acceptedGcb.length && !!decodeCode(` ${FIXTURES.gcbThemeWhite} `),
+      acceptedGcb.length ? `accepted: ${acceptedGcb.join(", ")}` : `${Object.keys(invalidGcbCodes).length} rejected`);
+    check(59, "Export stays gpb1:", encodeCode(settings).startsWith(CODE_PREFIX) && !encodeCode(settings).startsWith(GCB_CODE_PREFIX), encodeCode(settings));
 
     // The Presets row in the open modal.
     renderChips(m);
@@ -4050,6 +4097,18 @@
     realClick(m.undoButton);
     check(21, "Undo after Import restores exactly", JSON.stringify(settings) === beforeImport, JSON.stringify(settings));
     stillOpen("Undo after importing");
+    // A gcb1: code (#59): previews and applies with the current mode, and says where it's from.
+    realClick(m.importButton);
+    typeCode(FIXTURES.gcbThemeWhite);
+    const gcbExpected = decodeCode(FIXTURES.gcbThemeWhite);
+    const gcbPreviewed = stripShows(gcbExpected) && statusText() === PREVIEW_CODE_MESSAGE && JSON.stringify(settings) === beforeImport;
+    press(m.codeInput, "Enter");
+    check(59, "Import of a gcb1: code: previews in the strip, applies its colours with the current Spread mode, 'Imported code from Gradient Connect Bar · Undo'",
+      gcbPreviewed && settings.mode === JSON.parse(beforeImport).mode && settings.stops.map((x) => (x.kind === "theme" ? "t" : x.color)).join() === "t,#ff5f6d" &&
+        settings.gradient && undoShows("Imported code from Gradient Connect Bar") && m.importPanel.hidden,
+      `previewed ${gcbPreviewed}; ${JSON.stringify(settings)}; ${undoState()}`);
+    stillOpen("importing a gcb1: code");
+    realClick(m.undoButton);
 
     // Export (#54): writeClipboard()'s tiers in order with stubbed sources, then the real ones.
     const realSources = { ...clipboardSources };
