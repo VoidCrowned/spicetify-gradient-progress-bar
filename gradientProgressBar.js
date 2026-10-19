@@ -1,5 +1,5 @@
 // NAME: Gradient Progress Bar
-// VERSION: 1.6.1
+// VERSION: 1.7.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-progress-bar
 // DESCRIPTION: Recolours the song progress bar with a solid colour or a multi-stop gradient.
@@ -18,7 +18,7 @@
 (async function gpb() {
   "use strict";
 
-  const VERSION = "1.6.1";
+  const VERSION = "1.7.0";
   // Where this copy was loaded from: the Marketplace (jsDelivr) or the CLI (extensions/).
   // currentScript is only set before the first await, so capture it here (#39).
   const SOURCE = document.currentScript?.src || null;
@@ -38,7 +38,7 @@
   const api = (name) => window.Spicetify?.[name];
   // Profile-menu entry state (#27). Up here because status() can run while start-up still waits.
   let menuRegistered = false;
-  let topbarButton = null; // #45
+  let shared = null; // our handle on the shared top-bar entry (#45, #58): joinGradientBars()
   const menuItemVerdicts = new WeakMap(); // MenuItem component → usable?
 
   window.__gpb = {
@@ -2234,7 +2234,8 @@
       phase: startup.phase,
       entryErrors: startup.entryErrors,
       menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() }, // #27; info only, never a check
-      topbar: { created: !!topbarButton, connected: !!topbarButton?.element?.isConnected }, // #45
+      topbar: { created: !!shared?.button, connected: !!shared?.button?.element?.isConnected }, // #45
+      shared: shared?.status() ?? null, // #58
       startupError: startup.error,
       dom: domProbe(), // includes the song bar's DOM outline, for selector fixes after Spotify updates
     };
@@ -2282,19 +2283,24 @@
         menuApplicable
           ? startup.entryErrors.filter((e) => e.startsWith("Menu:")).join("; ") || `registered${menuItemUsable() ? "" : ", hidden while Spicetify's MenuItem is broken (spicetify/cli#4012)"}`
           : `not applicable: Spicetify.Menu.Item ${api("Menu")?.Item ? "exists" : "missing"}, Spicetify.ReactJSX ${api("ReactJSX") ? "exists" : "missing"}`);
-      check(45, "Top-bar button created as well, not only as a fallback", !api("Topbar")?.Button || !!topbarButton,
+      const role = shared?.role ?? "none";
+      check(45, "Top-bar button created as well, not only as a fallback: our own (owner, or next to another protocol) or the owner's shared one (#58)",
+        !api("Topbar")?.Button || (role === "member" ? !shared.button && !!shared.registry?.entries.some((e) => e.id === SELF.id) : !!shared?.button),
         !api("Topbar")?.Button
           ? "not applicable: Spicetify.Topbar.Button missing"
-          : !topbarButton
-            ? startup.entryErrors.filter((e) => e.startsWith("Topbar:")).join("; ") || "not created"
-            : topbarButton.element?.isConnected
-              ? "on screen"
-              : "created, waiting for Spicetify's top bar (#38)");
+          : role === "member"
+            ? `member: the shared button is ${shared.registry.owner}'s`
+            : !shared?.button
+              ? startup.entryErrors.filter((e) => e.startsWith("Topbar:")).join("; ") || "not created"
+              : shared.button.element?.isConnected
+                ? `${role}, "${shared.button.label}", on screen`
+                : `${role}, created, waiting for Spicetify's top bar (#38)`);
       check(39, "Exactly one copy of the extension is loaded", env.copies.length === 1,
         env.copies.length === 1
           ? env.copies[0]
           : `${env.copies.length} copies: ${env.copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions gradientProgressBar.js-), not both.`);
       await checkEntryIcon(check);
+      await checkSharedEntry(check);
       await runChecks(check, rootStyle, restoreButton);
     } catch (e) {
       check(23, "Self-test ran to completion", false, e?.stack || e);
@@ -2325,6 +2331,210 @@
     return report;
   }
 
+  // ── Shared top-bar button (#58) ──
+  async function checkSharedEntry(check) {
+    const st = statusReport();
+    const role = shared?.role ?? "none";
+    check(58, "status() reports shared next to topbar",
+      !!st.shared && ["protocol", "role", "owner", "entries"].every((k) => k in st.shared) && !!st.topbar && "created" in st.topbar,
+      JSON.stringify({ topbar: st.topbar, shared: st.shared }));
+
+    // The block's text is fixed: recomputed from this file's source (#58), so drift from GCB's
+    // copy shows up. The markers are built here, so this code never matches them itself.
+    const mark = (text) => `  // ── ${text} ──`;
+    const startMark = mark("Shared entry (protocol 1) — keep identical in GCB and GPB");
+    const endMark = mark("End shared entry");
+    let hashOk = false;
+    let hashDetail;
+    try {
+      const text = SOURCE
+        ? await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", SOURCE);
+          xhr.onload = () => (xhr.responseText ? resolve(xhr.responseText) : reject(new Error(`HTTP ${xhr.status}`)));
+          xhr.onerror = () => reject(new Error("request failed"));
+          xhr.send();
+        })
+        : null;
+      if (!text) hashDetail = "not measured: the extension's source URL is unknown";
+      else {
+        const lf = text.replace(/\r\n/g, "\n");
+        const start = lf.indexOf(startMark);
+        const end = lf.indexOf(endMark, start);
+        if (start === -1 || end === -1) hashDetail = "the block's markers aren't in the source";
+        else {
+          const block = lf.slice(start, end + endMark.length).replace(/^ {2}const SELF = .*\n/m, "");
+          const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(block));
+          const digest = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+          hashOk = digest === SHARED_ENTRY_SHA256;
+          hashDetail = hashOk ? `${digest.slice(0, 16)}…, ${block.length} characters` : `${digest} — expected ${SHARED_ENTRY_SHA256}`;
+        }
+      }
+    } catch (e) {
+      hashDetail = `not measured: ${e?.message || e}`;
+    }
+    check(58, "Shared entry block unchanged: its SHA-256 (without SELF) is the one in SHARED_ENTRY_SHA256, as in GCB",
+      hashOk || hashDetail.startsWith("not measured"), hashDetail);
+
+    // The live registry: never touched by the self-test.
+    const reg = window.__gradientBars;
+    if (role.startsWith("own button")) check(58, "Live registry: protocol 1, our entry exactly once, sorted by name", true, `not ours to check: ${role}`);
+    else {
+      const names = reg?.entries.map((e) => e.name) ?? [];
+      check(58, "Live registry: protocol 1, our entry exactly once, sorted by name",
+        reg?.protocol === 1 && reg.entries.filter((e) => e.id === SELF.id).length === 1 &&
+          names.join("|") === [...names].sort((a, b) => a.localeCompare(b)).join("|") && shared.registry === reg,
+        `owner ${reg?.owner}, entries ${reg?.entries.map((e) => e.id).join(", ")}`);
+    }
+    const gcb = window.__gcb;
+    if (!gcb) check(58, "With Gradient Connect Bar: exactly one top-bar button, the owner's", true, "not applicable: Gradient Connect Bar isn't running");
+    else {
+      const created = { gpb: !!st.topbar?.created, gcb: !!gcb.status?.().topbar?.created };
+      check(58, "With Gradient Connect Bar: exactly one top-bar button, the owner's",
+        Object.values(created).filter(Boolean).length === 1 && !!created[reg?.owner], `owner ${reg?.owner}; created ${JSON.stringify(created)}`);
+    }
+    // Alone, the button opens the settings directly, as in v1.6.1.
+    if (role === "owner" && reg?.entries.length === 1 && shared.button?.element?.isConnected) {
+      shared.button.element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+      const opened = !!modal?.root.isConnected;
+      const menuShown = !document.getElementById("gradient-bars-menu")?.hidden && !!document.getElementById("gradient-bars-menu");
+      if (modal) {
+        Spicetify.PopupModal.hide();
+        closeModal(modal);
+      }
+      check(58, "Alone: the live top-bar button ('Gradient Progress Bar') opens the settings directly, no menu",
+        opened && !menuShown && shared.button.label === "Gradient Progress Bar", `opened ${opened}, menu ${menuShown}, label "${shared.button.label}"`);
+    } else
+      check(58, "Alone: the live top-bar button ('Gradient Progress Bar') opens the settings directly, no menu", true,
+        `not applicable: ${role}, ${reg?.entries.length ?? 0} entries, button ${shared?.button?.element?.isConnected ? "on screen" : "not on screen"}`);
+
+    // A separate instance from the same factory: its own key and prefix, fake buttons, stub
+    // opens; removed afterwards.
+    const KEY = "__gradientBarsSelfTest";
+    const OTHER_KEY = "__gradientBarsSelfTestOther";
+    const PREFIX = "gradient-bars-selftest";
+    const liveBefore = window.__gradientBars;
+    const liveEntries = liveBefore?.entries.map((e) => e.id).join();
+    const opened = [];
+    const buttons = [];
+    const fakeButton = (label, icon, onClick) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = `${PREFIX}-anchor`;
+      el.textContent = "♪";
+      Object.assign(el.style, { position: "fixed", top: "12px", right: "60px", width: "32px", height: "32px", zIndex: "99999" });
+      el.addEventListener("click", () => onClick());
+      document.body.append(el);
+      const fake = { element: el, label, icon };
+      buttons.push(fake);
+      return fake;
+    };
+    const entry = (id, name) => ({ id: `${id}-selftest`, name, open: () => opened.push(id) });
+    const clickAt = (el, keyboard = false) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: keyboard ? 0 : 1 }));
+    const key = (el, k) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+    const menuEl = () => document.getElementById(`${PREFIX}-menu`);
+    const shown = () => !!menuEl() && !menuEl().hidden;
+    const items = () => [...(menuEl()?.querySelectorAll(`.${PREFIX}-item`) ?? [])];
+    let a, b, c;
+    try {
+      a = joinGradientBars({ self: entry("gpb", "Gradient Progress Bar"), key: KEY, prefix: PREFIX, createButton: fakeButton });
+      a.ensureButton();
+      const anchor = a.button?.element;
+      clickAt(anchor);
+      check(58, "Protocol test instance, one entry: the owner's button opens it directly (no menu), labelled with its name",
+        a.role === "owner" && window[KEY]?.protocol === 1 && opened.join() === "gpb" && !shown() && a.button.label === "Gradient Progress Bar",
+        `role ${a.role}, opened ${opened.join() || "nothing"}, menu ${shown() ? "shown" : "none"}, label "${a.button?.label}"`);
+
+      b = joinGradientBars({ self: entry("gcb", "Gradient Connect Bar"), key: KEY, prefix: PREFIX, createButton: fakeButton });
+      const memberButton = b.ensureButton();
+      opened.length = 0;
+      clickAt(anchor);
+      const names = items().map((el) => el.textContent).join(", ");
+      const r = anchor.getBoundingClientRect();
+      const mr = menuEl()?.getBoundingClientRect();
+      const roles = menuEl()?.getAttribute("role") === "menu" && items().every((el) => el.getAttribute("role") === "menuitem");
+      check(58, "Two entries: one button only ('Gradient bars'); a click shows the menu with both, in name order, 8 px below the button, right edges aligned",
+        b.role === "member" && !memberButton && buttons.length === 1 && a.button.label === "Gradient bars" && shown() && roles &&
+          names === "Gradient Connect Bar, Gradient Progress Bar" && !opened.length && document.activeElement !== items()[0] &&
+          Math.abs(mr.top - (r.bottom + 8)) <= 1 && Math.abs(mr.right - r.right) <= 1 && menuEl().parentElement === document.body,
+        `member ${b.role}, buttons ${buttons.length}, label "${a.button.label}", items ${names}; menu ${mr ? `${mr.left.toFixed(0)},${mr.top.toFixed(0)}–${mr.right.toFixed(0)}` : "none"}, button bottom ${r.bottom.toFixed(0)}, right ${r.right.toFixed(0)}`);
+
+      const steps = [];
+      const step = (label, ok) => steps.push(`${label}${ok ? "" : " ✗"}`);
+      document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+      step("outside pointerdown closes", !shown());
+      anchor.focus();
+      clickAt(anchor, true);
+      const list = items();
+      step("keyboard open focuses the first item", shown() && document.activeElement === list[0]);
+      key(document.activeElement, "ArrowDown");
+      step("↓", document.activeElement === list[1]);
+      key(document.activeElement, "ArrowDown");
+      step("↓ wraps", document.activeElement === list[0]);
+      key(document.activeElement, "ArrowUp");
+      step("↑ wraps", document.activeElement === list[1]);
+      key(document.activeElement, "Home");
+      step("Home", document.activeElement === list[0]);
+      key(document.activeElement, "End");
+      step("End", document.activeElement === list[1]);
+      key(document.activeElement, "Escape");
+      step("Escape closes and refocuses the button", !shown() && document.activeElement === anchor);
+      clickAt(anchor, true);
+      key(document.activeElement, "Tab");
+      step("Tab closes", !shown());
+      clickAt(anchor);
+      window.dispatchEvent(new Event("blur"));
+      step("window blur closes", !shown());
+      clickAt(anchor);
+      window.dispatchEvent(new Event("resize"));
+      step("resize closes", !shown());
+      clickAt(anchor);
+      clickAt(anchor);
+      step("a second click on the button closes", !shown());
+      check(58, "Menu keyboard and closing: first item focused from the keyboard, ↑/↓ wrap, Home/End, Escape, Tab, outside pointerdown, blur, resize",
+        !steps.some((x) => x.endsWith("✗")), steps.join("; "));
+
+      opened.length = 0;
+      clickAt(anchor);
+      const second = items()[1];
+      second.click();
+      const hiddenFirst = !shown() && !opened.length && second.isConnected;
+      await tick();
+      const thenOpened = opened.join();
+      anchor.focus();
+      clickAt(anchor, true);
+      key(document.activeElement, "Enter");
+      const enterHidden = !shown() && opened.length === 1;
+      await tick();
+      check(58, "Activating an item hides the menu first, then opens that entry in the next task (click and Enter)",
+        hiddenFirst && thenOpened === "gpb" && enterHidden && opened.join() === "gpb,gcb",
+        `hidden first ${hiddenFirst}, then opened ${thenOpened}; Enter: hidden first ${enterHidden}, opened ${opened.join()}`);
+
+      window[OTHER_KEY] = { protocol: 2, entries: [] };
+      c = joinGradientBars({ self: entry("gpb", "Gradient Progress Bar"), key: OTHER_KEY, prefix: `${PREFIX}-other`, createButton: fakeButton });
+      c.ensureButton();
+      opened.length = 0;
+      clickAt(c.button.element);
+      check(58, "Another protocol: own button path, its own label, opens directly, the foreign registry untouched",
+        c.role === "own button (protocol 2)" && !c.registry && c.button?.label === "Gradient Progress Bar" && opened.join() === "gpb" &&
+          JSON.stringify(window[OTHER_KEY]) === JSON.stringify({ protocol: 2, entries: [] }) && c.status().role === "own button (protocol 2)",
+        `role ${c.role}, label "${c.button?.label}", opened ${opened.join()}, registry ${JSON.stringify(window[OTHER_KEY])}`);
+    } catch (e) {
+      check(58, "Protocol test instance ran", false, e?.stack || e);
+    } finally {
+      a?.dispose();
+      b?.dispose();
+      c?.dispose();
+      delete window[KEY];
+      delete window[OTHER_KEY];
+      for (const fake of buttons) fake.element.remove();
+    }
+    check(58, "The live registry is untouched by the test instance; nothing of the test instance is left",
+      window.__gradientBars === liveBefore && window.__gradientBars?.entries.map((e) => e.id).join() === liveEntries &&
+        !(KEY in window) && !(OTHER_KEY in window) && !document.querySelector(`[id^="${PREFIX}"], [class^="${PREFIX}"]`),
+      `live entries ${window.__gradientBars?.entries.map((e) => e.id).join() ?? "none"}`);
+  }
+
   // ── Entry icon (#44) ──
   async function checkEntryIcon(check) {
     check(44, "Entry icon: currentColor, 16 × 16 viewBox, no id= and no <defs>",
@@ -2341,7 +2551,9 @@
     const size = (svg) => px(svg)?.map((n) => n.toFixed(1)).join(" × ").concat(" px") ?? "not rendered";
     const is16 = (svg) => !!px(svg)?.every((n) => Math.abs(n - 16) <= 1);
 
-    const button = document.querySelector(`button[aria-label="${ENTRY_LABEL}"]`);
+    // Ours, or the owner's shared one (#58): the same icon either way.
+    const button = shared?.button?.element ??
+      [...document.querySelectorAll("button[aria-label]")].find((el) => ["Gradient bars", "Gradient Connect Bar"].includes(el.getAttribute("aria-label")));
     const svg = button?.querySelector("svg");
     if (svg) {
       const fill = getComputedStyle(svg).fill;
@@ -3511,6 +3723,7 @@
       accepted.length ? `accepted: ${accepted.join(", ")}` : `${Object.keys(invalidCodes).length} rejected`);
     check(21, "Whitespace around a code is accepted", !!decodeCode(`  \n${threeColours}\t `), "");
 
+
     // The Presets row in the open modal.
     renderChips(m);
     const chipIds = () => [...m.chips.querySelectorAll(".gpb-chip")].filter((el) => !el.hidden)
@@ -3808,30 +4021,30 @@
         JSON.stringify(settings) === beforeImport,
       `panel open ${importOpen}, aria-invalid ${m.codeInput.getAttribute("aria-invalid")}, error "${m.importError.textContent}"`);
     stillOpen("an invalid import");
-    const shared = { version: SCHEMA_VERSION, gradient: true, mode: "slide", stops: [theme("x"), custom("y", BLUE)] };
+    const codeSample = { version: SCHEMA_VERSION, gradient: true, mode: "slide", stops: [theme("x"), custom("y", BLUE)] };
     const cssBeforeImport = styleText();
     const typeCode = (value) => {
       m.codeInput.value = value;
       m.codeInput.dispatchEvent(new Event("input", { bubbles: true }));
     };
-    typeCode(`  ${encodeCode(shared)}  `);
+    typeCode(`  ${encodeCode(codeSample)}  `);
     const errorCleared = !m.codeInput.hasAttribute("aria-invalid") && !m.importError.textContent;
     check(51, "A valid code in the Import field previews in the strip ('Previewing code — Apply to use it'); settings and #gpb-style unchanged",
-      errorCleared && stripShows(shared) && statusText() === PREVIEW_CODE_MESSAGE && JSON.stringify(settings) === beforeImport &&
+      errorCleared && stripShows(codeSample) && statusText() === PREVIEW_CODE_MESSAGE && JSON.stringify(settings) === beforeImport &&
         styleText() === cssBeforeImport, `status "${statusText()}"`);
     typeCode("");
     const clearedReverts = stripShows(settings) && !statusText();
-    typeCode(encodeCode(shared));
+    typeCode(encodeCode(codeSample));
     press(m.codeInput, "Escape");
     check(51, "Clearing the field or Escape (field closed) reverts the strip and the status line",
       clearedReverts && m.importPanel.hidden && stripShows(settings) && !statusText() && JSON.stringify(settings) === beforeImport,
       `cleared reverts ${clearedReverts}; panel hidden ${m.importPanel.hidden}, status "${statusText()}"`);
     stillOpen("previewing a code");
     realClick(m.importButton);
-    typeCode(`  ${encodeCode(shared)}  `);
+    typeCode(`  ${encodeCode(codeSample)}  `);
     realClick(applyNode);
     check(21, "Import: a valid code applies at once (no arming), the field closes, 'Imported code · Undo'; Apply stays connected",
-      errorCleared && sameSettings(settings, shared) && m.importPanel.hidden && undoShows("Imported code") && applyNode.isConnected,
+      errorCleared && sameSettings(settings, codeSample) && m.importPanel.hidden && undoShows("Imported code") && applyNode.isConnected,
       `${JSON.stringify(settings)}; ${undoState()}`);
     stillOpen("importing a code");
     realClick(m.undoButton);
@@ -4031,7 +4244,8 @@
       spicetify: spicetifyVersion(), // #55
       apis: Object.fromEntries(["LocalStorage", "PopupModal", "Player", "Menu", "Topbar", "ReactJSX"].map((n) => [n, !!api(n)])),
       menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() },
-      topbar: { created: !!topbarButton, connected: !!topbarButton?.element?.isConnected },
+      topbar: { created: !!shared?.button, connected: !!shared?.button?.element?.isConnected },
+      shared: shared?.status() ?? null, // #58
       page: location.href,
       dom: domProbe(),
     };
@@ -4048,6 +4262,215 @@
   // the way Spicetify renders its own named icons).
   const ENTRY_ICON =
     '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M14.6 1.4a1.3 1.3 0 0 0-1.85 0L7.6 6.55l1.85 1.85 5.15-5.15a1.3 1.3 0 0 0 0-1.85zM6.7 7.5c-1.3 0-2.2 1-2.2 2.3 0 .5-.3.9-.9 1.1 1.5.9 4.3.7 4.9-1.3.1-.4.1-.7 0-1z"/><rect x="0.5" y="12.5" width="15" height="2.5" rx="1.25" opacity=".35"/><rect x="0.5" y="12.5" width="9" height="2.5" rx="1.25"/></svg>';
+
+  // ── Shared entry (protocol 1) — keep identical in GCB and GPB ──
+  // Gradient Connect Bar and Gradient Progress Bar share one top-bar button. Whichever starts
+  // first creates window.__gradientBars (it's the owner) and the only button; the other registers
+  // its entry. One entry: the button opens it directly. Two: a small menu with both. Each
+  // extension keeps its own right-click and profile-menu entries; the only call across is
+  // entries[i].open. This block depends on nothing but SELF, ENTRY_ICON and window.Spicetify.
+  // joinGradientBars() takes overrides for a separate test instance (key, prefix, createButton);
+  // the live registry uses the defaults.
+  const SELF = { id: "gpb", name: "Gradient Progress Bar", open: openModal };
+
+  function joinGradientBars({ self = SELF, key = "__gradientBars", prefix = "gradient-bars", createButton = null } = {}) {
+    const PROTOCOL = 1;
+    const MULTI_LABEL = "Gradient bars";
+    const GAP = 8; // menu below the button, and its distance from the window edges
+    const makeButton = createButton ?? ((label, icon, onClick) => new window.Spicetify.Topbar.Button(label, icon, onClick));
+    let button = null;
+    let hideMenu = () => {};
+    const errors = [];
+
+    // The registry: created by the first extension, a synchronous check-and-set, so two that
+    // start close together can't both become owner. Its shape is frozen for protocol 1.
+    function ownerRegistry() {
+      let menu = null;
+      let anchor = null;
+      let detach = null; // removes the open menu's listeners
+      const items = () => [...menu.querySelectorAll(`.${prefix}-item`)];
+      const reg = {
+        protocol: PROTOCOL,
+        owner: self.id,
+        entries: [],
+        // Adds, or replaces by id; sorted by name.
+        register(entry) {
+          const i = reg.entries.findIndex((e) => e.id === entry.id);
+          if (i === -1) reg.entries.push(entry);
+          else reg.entries[i] = entry;
+          reg.entries.sort((a, b) => a.name.localeCompare(b.name));
+          reg.refresh();
+        },
+        refresh() {
+          if (button) button.label = reg.entries.length === 1 ? reg.entries[0].name : MULTI_LABEL;
+        },
+        // One entry: open it. Two or more: toggle the menu. Entries are read at click time.
+        click(at) {
+          if (reg.entries.length === 1) return reg.entries[0].open();
+          if (menu && !menu.hidden) return hide();
+          // Keyboard activation clicks with detail 0 (or isn't a click at all).
+          const e = window.event;
+          show(at, e ? e.type !== "click" || e.detail === 0 : !!at?.matches?.(":focus-visible"));
+        },
+      };
+
+      // One element, appended once, hidden and shown, never removed while the page lives.
+      function build() {
+        menu = document.getElementById(`${prefix}-menu`);
+        if (menu) return;
+        menu = document.createElement("div");
+        menu.id = `${prefix}-menu`;
+        menu.setAttribute("role", "menu");
+        menu.setAttribute("aria-label", MULTI_LABEL);
+        menu.hidden = true;
+        menu.innerHTML = `<style>
+#${prefix}-menu { position: fixed; z-index: 9999; display: flex; flex-direction: column; box-sizing: border-box; min-width: 180px; padding: 4px; border-radius: 8px; background-color: var(--spice-card, var(--spice-main)); color: var(--spice-text); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+#${prefix}-menu[hidden] { display: none; }
+.${prefix}-item { padding: 8px 12px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; font-size: .875rem; text-align: left; white-space: nowrap; cursor: pointer; }
+.${prefix}-item:hover, .${prefix}-item:focus-visible { outline: none; background-color: color-mix(in srgb, var(--spice-button) 20%, transparent); }
+</style>`;
+        menu.addEventListener("keydown", (e) => {
+          const list = items();
+          const i = list.indexOf(document.activeElement);
+          const next = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key];
+          if (next !== undefined) {
+            e.preventDefault();
+            list[(next + list.length) % list.length]?.focus();
+          } else if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (i !== -1) activate(i);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            hide({ refocus: true });
+          } else if (e.key === "Tab") hide();
+        });
+        menu.addEventListener("click", (e) => {
+          const item = e.target.closest(`.${prefix}-item`);
+          if (item) activate(items().indexOf(item));
+        });
+        document.body.append(menu);
+      }
+
+      // The items are rebuilt on opening only, never during a click on one of them.
+      function show(at, keyboard) {
+        build();
+        for (const item of items()) item.remove();
+        for (const entry of reg.entries) {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = `${prefix}-item`;
+          item.setAttribute("role", "menuitem");
+          item.dataset.entry = entry.id;
+          item.textContent = entry.name;
+          menu.append(item);
+        }
+        anchor = at ?? null;
+        menu.hidden = false;
+        place();
+        const outside = (e) => !menu.contains(e.target) && !anchor?.contains(e.target) && hide();
+        const close = () => hide();
+        document.addEventListener("pointerdown", outside, true);
+        document.addEventListener("scroll", close, true);
+        window.addEventListener("blur", close);
+        window.addEventListener("resize", close);
+        detach = () => {
+          document.removeEventListener("pointerdown", outside, true);
+          document.removeEventListener("scroll", close, true);
+          window.removeEventListener("blur", close);
+          window.removeEventListener("resize", close);
+        };
+        if (keyboard) items()[0]?.focus({ preventScroll: true });
+      }
+
+      // 8 px below the button, right edges aligned, clamped into the window.
+      function place() {
+        const r = anchor?.getBoundingClientRect() ?? { right: innerWidth - GAP, bottom: GAP };
+        const { width, height } = menu.getBoundingClientRect();
+        const left = Math.min(Math.max(r.right - width, GAP), Math.max(GAP, innerWidth - GAP - width));
+        const top = Math.min(Math.max(r.bottom + GAP, GAP), Math.max(GAP, innerHeight - GAP - height));
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+      }
+
+      function hide({ refocus = false } = {}) {
+        if (!menu || menu.hidden) return;
+        menu.hidden = true;
+        detach?.();
+        detach = null;
+        if (refocus && anchor?.isConnected) anchor.focus({ preventScroll: true });
+      }
+      hideMenu = hide;
+
+      // Hidden first, then opened in the next task: the clicked item stays connected.
+      function activate(i) {
+        const entry = reg.entries[i];
+        hide();
+        if (entry) setTimeout(() => entry.open(), 0);
+      }
+
+      return reg;
+    }
+
+    const found = window[key];
+    let registry = null;
+    let role;
+    if (found?.protocol === PROTOCOL) {
+      registry = found;
+      role = "member";
+    } else if (found) role = `own button (protocol ${found.protocol})`;
+    else {
+      registry = window[key] = ownerRegistry();
+      role = "owner";
+    }
+    registry?.register(self);
+
+    // The owner (or, next to another protocol, each extension) creates one button at most. It
+    // stays registered while it isn't on screen yet: Spicetify mounts it once it finds its top bar.
+    function ensureButton() {
+      if (button || role === "member") return button;
+      if (!createButton && !window.Spicetify?.Topbar?.Button) return null;
+      try {
+        if (registry) {
+          button = makeButton(self.name, ENTRY_ICON, () => registry.click(button?.element));
+          registry.refresh();
+        } else button = makeButton(self.name, ENTRY_ICON, () => self.open());
+      } catch (e) {
+        errors.push(`Topbar: ${e?.message || e}`);
+      }
+      return button;
+    }
+
+    return {
+      role,
+      registry,
+      errors,
+      ensureButton,
+      get button() {
+        return button;
+      },
+      status: () => ({
+        protocol: registry?.protocol ?? found?.protocol ?? PROTOCOL,
+        role,
+        owner: registry?.owner ?? null,
+        entries: registry ? registry.entries.map((e) => e.id) : [self.id],
+      }),
+      // Test instances only: the live menu and registry stay for the page's lifetime.
+      dispose() {
+        hideMenu();
+        document.getElementById(`${prefix}-menu`)?.remove();
+        button?.element?.remove();
+        if (role === "owner" && window[key] === registry) delete window[key];
+      },
+    };
+  }
+  // ── End shared entry ──
+
+  // Shared entry block hash (#58): SHA-256 of the text from the start marker to the end marker,
+  // without the SELF line, with LF line endings: 691e7f30deccee36a447bcac5b5b42e25abeb34bbb80ff812d2ddc19e808ed4f
+  // The block in gradientConnectBar.js has the same hash. The self-test recomputes it from this
+  // file, so drift shows up; change both copies or neither.
+  const SHARED_ENTRY_SHA256 = "691e7f30deccee36a447bcac5b5b42e25abeb34bbb80ff812d2ddc19e808ed4f";
 
   // The settings always open by right-clicking the song progress bar: one delegated listener,
   // no Spicetify UI wrappers, nothing for a Spotify update to remove. Spicetify's profile menu
@@ -4122,19 +4545,22 @@
     }
   }
 
-  // One button at most. One that isn't on screen yet stays registered: Spicetify keeps it and
-  // mounts it once it finds its top bar (#38).
+  // The shared top-bar button (#58): a member creates none (the owner's button lists us); the
+  // owner (or, next to another protocol, each extension) creates one once Spicetify.Topbar exists,
+  // waiting up to 15 s for it. One button at most. One that isn't on screen yet stays registered:
+  // Spicetify keeps it and mounts it once it finds its top bar (#38). Alone, the button opens the
+  // settings directly, as before.
   async function registerTopbarEntry() {
-    if (!api("Topbar")?.Button || topbarButton) return null;
-    try {
-      topbarButton = new Spicetify.Topbar.Button(ENTRY_LABEL, ENTRY_ICON, openModal);
-      window.__gpb.topbarButton = topbarButton;
-    } catch (e) {
-      startup.entryErrors.push(`Topbar: ${e?.message || e}`);
+    if (shared.role === "member") return `shared top-bar button (owner: ${shared.registry.owner})`;
+    for (let waited = 0; !api("Topbar")?.Button && waited < 15000; waited += 250) await sleep(250);
+    if (!api("Topbar")?.Button) return null;
+    if (!shared.ensureButton()) {
+      startup.entryErrors.push(...shared.errors);
       return null;
     }
+    window.__gpb.topbarButton = shared.button;
     for (let waited = 0; waited < 4000; waited += 250) {
-      if (topbarButton.element?.isConnected) return "top bar button";
+      if (shared.button.element?.isConnected) return "top bar button";
       await sleep(250);
     }
     startup.entryErrors.push("Topbar: button created, not on screen yet (Spicetify hasn't found its top bar, #38)");
@@ -4149,6 +4575,7 @@
     applyCss(); // the bar works even if no entry point can be registered
     window.__gpb = { version: VERSION, status: () => statusReport(), selfTest, open: () => modal || openModal() };
     startup.entry = enableBarContextMenu();
+    shared = joinGradientBars(); // #58, synchronous: the registry is claimed before anything awaits
     startup.phase = "registering entry point";
     const extra = await registerSpicetifyEntries();
     if (extra) startup.entry += ` + ${extra}`;
