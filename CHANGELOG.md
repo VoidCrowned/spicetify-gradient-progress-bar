@@ -2,7 +2,7 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
-## [1.7.0] — unreleased
+## [1.7.0] — 2026-10-19
 
 ### Added
 - **One top-bar button with Gradient Connect Bar** ([#58](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/58)). With [Gradient Connect Bar](https://github.com/VoidCrowned/spicetify-gradient-connect-bar) installed too, the two extensions share **one** brush button in the top bar instead of two identical ones. It's labelled *Gradient bars* and opens a small menu with both; pick one to open its settings. The menu works with the keyboard too, and Escape or clicking elsewhere closes it.
