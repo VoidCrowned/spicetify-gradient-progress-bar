@@ -2,6 +2,14 @@
 
 All notable changes to Gradient Progress Bar. Versions follow [semantic versioning](https://semver.org).
 
+## [1.7.0] — unreleased
+
+### Added
+- **One top-bar button with Gradient Connect Bar** ([#58](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/58)). With [Gradient Connect Bar](https://github.com/VoidCrowned/spicetify-gradient-connect-bar) installed too, the two extensions share **one** brush button in the top bar instead of two identical ones. It's labelled *Gradient bars* and opens a small menu with both; pick one to open its settings. The menu works with the keyboard too, and Escape or clicking elsewhere closes it.
+  - On its own, Gradient Progress Bar works as before: the button opens its settings straight away. Its tooltip now reads *Gradient Progress Bar*.
+  - The profile menu keeps a separate entry for each extension, and right-clicking the song progress bar still opens these settings.
+- **Import takes Gradient Connect Bar's codes** ([#59](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/59)). Paste a `gcb1:…` code into *Import*: its colours apply and your Spread choice stays. The status line says *Imported code from Gradient Connect Bar*, with Undo. *Export* still gives `gpb1:` codes, which Gradient Connect Bar imports in turn.
+
 ## [1.6.1] — 2026-10-18
 
 ### Changed
