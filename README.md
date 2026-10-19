@@ -4,7 +4,7 @@ A [Spicetify](https://spicetify.app) extension that recolours Spotify's song pro
 
 > **Status:** released — **v1.6.1**; v1.7.0 is in testing. See the [changelog](CHANGELOG.md) and the [roadmap](ROADMAP.md).
 
-![Gradient Progress Bar: a gradient song progress bar and the settings window with the inline colour picker](preview.png)
+<p align="center"><img src="preview.png" alt="Gradient Progress Bar: a gradient song progress bar and the settings window with the inline colour picker" width="580"></p>
 
 ## Features
 
