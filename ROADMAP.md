@@ -2,6 +2,13 @@
 
 Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/milestones). Issues are the source of truth; this file is kept in sync when they change.
 
+## v1.7.0 — planned
+
+| # | Issue | Area | Status |
+|---|---|---|---|
+| [#58](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/58) | Shared top-bar button with Gradient Connect Bar (protocol 1; alone it works as before) | ui, compatibility | ⬜ |
+| [#59](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/59) | Import accepts Gradient Connect Bar codes (`gcb1:`) | ui, compatibility | ⬜ |
+
 ## v1.6.1 — released 2026-10-18
 
 | # | Issue | Area | Status |
