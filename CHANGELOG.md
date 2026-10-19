@@ -13,6 +13,9 @@ All notable changes to Gradient Progress Bar. Versions follow [semantic versioni
 ### Changed
 - The top-bar tooltip and the profile-menu entry read *Gradient Progress Bar*, matching the settings window.
 
+### Fixed
+- The self-test's check that the settings window removes its song-change listener on close could fail when another extension added or removed its own listener during the run ([#60](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/60)). It now looks for its own listener.
+
 ## [1.6.1] — 2026-10-18
 
 ### Changed

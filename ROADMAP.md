@@ -8,6 +8,7 @@ Mirrors the [GitHub milestones](https://github.com/VoidCrowned/spicetify-gradien
 |---|---|---|---|
 | [#58](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/58) | Shared top-bar button with Gradient Connect Bar (protocol 1; alone it works as before) | ui, compatibility | ✅ |
 | [#59](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/59) | Import accepts Gradient Connect Bar codes (`gcb1:`) | ui, compatibility | ✅ |
+| [#60](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/issues/60) | Self-test: the songchange check counts other extensions' listeners | bug, testing | ✅ |
 
 ## v1.6.1 — released 2026-10-18
 

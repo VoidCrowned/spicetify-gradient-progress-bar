@@ -2127,7 +2127,9 @@
   const styleText = () => document.getElementById("gpb-style")?.textContent ?? null;
   const songFill = () => document.querySelector(`${SCOPE} ${FILL}`);
   const songHandle = () => document.querySelector(`${SCOPE} ${HANDLE}`);
-  const songchangeCount = () => Spicetify.Player.eventListeners?.songchange?.length ?? 0;
+  // Other extensions add and remove their own listeners at any time, so the self-test looks for
+  // ours by identity rather than comparing counts across the run (#60).
+  const songchangeListeners = () => [...(Spicetify.Player.eventListeners?.songchange ?? [])];
   const computedHex = (el, prop) => (el ? toHex(getComputedStyle(el)[prop]) : null);
 
   // Variables themes and other extensions read from the bar — we must never change them.
@@ -2777,7 +2779,6 @@
         closeModal(modal);
       }
     }
-    const listenersBefore = songchangeCount();
     openModal();
     let m = modal;
     check(3, "Modal opens", m?.root.isConnected, "");
@@ -4205,6 +4206,7 @@
     const oldLabel = m.resetLabel;
     Spicetify.PopupModal.hide();
     await tick(); // the close observer runs the clean-ups
+    const listenersBefore = songchangeListeners(); // nothing async until listenersOpen
     openModal();
     m = modal;
     check(37, "Arm, close and reopen → the button reads 'Reset' (timer cleared)",
@@ -4213,13 +4215,16 @@
       `new "${m?.resetLabel.textContent}", old "${oldLabel.textContent}"`);
     if (!m) return;
 
-    const listenersOpen = songchangeCount();
+    const listenersOpen = songchangeListeners();
+    const ours = listenersOpen.filter((fn) => !listenersBefore.includes(fn));
     const observersOpen = liveObservers;
     Spicetify.PopupModal.hide();
     await tick();
-    check(7, "songchange listener: +1 while open, removed on close",
-      listenersOpen === listenersBefore + 1 && songchangeCount() === listenersBefore,
-      `${listenersBefore} → ${listenersOpen} → ${songchangeCount()}`);
+    const listenersAfter = songchangeListeners();
+    check(7, "songchange listener: exactly one of ours while open, removed on close",
+      ours.length === 1 && !listenersAfter.includes(ours[0]),
+      `${listenersBefore.length} → ${listenersOpen.length} → ${listenersAfter.length}, ours added ${ours.length}, ` +
+        `removed ${ours.length === 1 && !listenersAfter.includes(ours[0])}`);
     check(7, "Modal observers disconnected on close", observersOpen > 0 && liveObservers === 0 && modal === null,
       `${observersOpen} → ${liveObservers}`);
     check(11, "Nothing of ours left in the page after close (Hazy Settings can open cleanly)",
