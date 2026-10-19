@@ -29,6 +29,7 @@ It covers:
   - `status()` has `shared` next to `topbar`; the shared entry block's SHA-256 (without `SELF`, recomputed from the extension's source) equals `SHARED_ENTRY_SHA256`, as in GCB;
   - the live registry has protocol 1, our entry once, sorted by name; with Gradient Connect Bar running, exactly one of the two has created the button, the owner; alone, the live button (*Gradient Progress Bar*) opens the settings directly, no menu;
   - on a separate test instance (its own key and prefix, fake buttons, removed afterwards; the live registry is never touched): one entry opens directly; two give one *Gradient bars* button and a menu with both in name order, 8 px below the button with right edges aligned; keyboard (first item focused, ↑/↓ wrap, Home/End, Escape refocuses the button, Tab) and closing (outside pointerdown, blur, resize, a second click); activation hides first and opens in the next task; another protocol gives the own-button path.
+- Product name (#58): the profile-menu entry's label (`ENTRY_LABEL`) and the settings window's title are both *Gradient Progress Bar*, the manifest name.
 - Entry icon (#44): `currentColor`, a 16 × 16 viewBox, no `id=` or `<defs>`; the top-bar icon (when the button is on screen) renders at 16 × 16 px in the button's colour; nested in Spotify's `IconComponent` as the profile menu shows it, it still renders at 16 × 16 px.
 - Inert by default: empty stylesheet, bar unchanged.
 - Scoping: the volume bar is never styled. No `!important`, no layout or mask properties, and the bar's theme variables are left alone.

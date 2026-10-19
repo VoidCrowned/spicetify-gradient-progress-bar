@@ -2782,6 +2782,12 @@
     let m = modal;
     check(3, "Modal opens", m?.root.isConnected, "");
     if (!m) return;
+    {
+      const name = "Gradient Progress Bar"; // manifest.json
+      const title = m.root.closest('[role="dialog"]')?.querySelector("h1")?.textContent.trim();
+      check(58, "The menu entry's label and the settings window's title are the manifest name, 'Gradient Progress Bar'",
+        ENTRY_LABEL === name && title === name, `entry "${ENTRY_LABEL}", title "${title}"`);
+    }
     // Records whether the modal survived an action; reopens it so later checks still run.
     const stillOpen = (after) => {
       const open = m.root.isConnected && modal === m;
@@ -4314,7 +4320,9 @@
 
   // ── Start-up ────────────────────────────────────────────────────────────────
 
-  const ENTRY_LABEL = "Gradient progress bar";
+  // The product name as in manifest.json, every word capitalised; the self-test compares it with
+  // the settings window's title.
+  const ENTRY_LABEL = "Gradient Progress Bar";
   // A brush over a progress bar (#44). Monochrome (currentColor follows the theme and hover),
   // 16 × 16, no <defs> and no ids: ids in inline SVG are document-global. Used as-is by the top
   // bar (the button's innerHTML) and the profile menu (nested inside Spotify's IconComponent,

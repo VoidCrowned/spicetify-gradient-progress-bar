@@ -55,6 +55,7 @@ The maintainer has little time at the PC and wants to **bug-test finished builds
 - Small named functions: `loadSettings`, `saveSettings` (debounced), `buildCss`, `applyCss`, `resolveStop` (UI swatches only), `openModal`, `renderStops`.
 - Every id and class prefixed **`gpb-`**. Storage key `gpb:settings`. Console output prefixed **`[gpb]`**.
 - UI strings and docs in **British English** ("colour").
+- Product names: **Gradient Progress Bar**, **Gradient Connect Bar**, every word capitalised (user-visible text, docs, issues). Spotify's element is 'the song progress bar'.
 - Top-of-file comment block: name, version, author, repo link, and a short *Compatibility rules* section restating the hard rules below.
 
 ## Verified facts — Spotify DOM
