@@ -8,14 +8,17 @@ A [Spicetify](https://spicetify.app) extension that recolours Spotify's song pro
 
 ## Features
 
-- **Solid colour or gradient** — start with one colour; add more and the bar becomes a gradient automatically. The gradient always runs from the start of the bar to the playhead, so it looks balanced at any point in the song.
-- **Three ways to spread a gradient** — *Compress* fits the whole gradient between the start and the playhead, *Anchored* keeps the colours fixed to the bar and reveals them as the song plays, *Slide* moves a full-length gradient in with the playhead.
-- **Up to 8 colours**, edited in a built-in colour picker with R/G/B and hex input, reorderable by drag-and-drop.
-- **Theme colour stop** — a colour that follows your theme's accent instead of a fixed value. With themes that change their accent per song (like Hazy's album-art mode), the bar follows along.
-- **Presets** — five built-in gradients (Void, Sunset, Aurora, Neon, Fairy) in their own row, and up to 12 of your own below them, with a preview and Undo.
-- **Share codes** — copy your settings as a short code (`gpb1:…`) and paste someone else's to try it. Codes from [Gradient Connect Bar](https://github.com/VoidCrowned/spicetify-gradient-connect-bar) (`gcb1:…`) work too.
-- **Live preview** — changes show on the bar as you pick.
-- **Leaves everything else alone** — only the song progress bar changes; the volume slider, layout and your theme's other styling stay as they are. With default settings the extension changes nothing at all.
+Your progress bar, your colours. Pick one colour or blend up to eight into a gradient, and the bar changes as you go.
+
+- **Paint it your way.** Click a colour dot, then drag in the picker, type a hex code, or take any colour from the screen with the eyedropper. Press **+** for another colour and the bar becomes a gradient. Drag the dots to reorder them.
+- **Three ways to spread a gradient.**
+  - *Compress* fits the whole gradient between the start and the playhead.
+  - *Anchored* keeps the colours fixed to the bar and reveals them as the song plays.
+  - *Slide* moves a full-length gradient in with the playhead.
+- **Match your theme.** *Use theme colour* makes a colour follow your theme's accent, even one that changes with every album cover, like Hazy's album-art mode.
+- **Presets to start from.** There are five built-in gradients (Void, Sunset, Aurora, Neon, Fairy) and room for 12 of your own. Click a preset once to preview it and again to apply it. *Undo* is there if you change your mind.
+- **Share your look.** **Export** copies your settings as a short code (`gpb1:…`), and whoever you send it to pastes it into **Import**. Codes from [Gradient Connect Bar](https://github.com/VoidCrowned/spicetify-gradient-connect-bar) (`gcb1:…`) work too.
+- **Plays nicely with others.** Only the song progress bar changes. The volume slider, the layout and your theme stay as they are. With default settings the extension changes nothing at all, and *Reset* takes you back there in two clicks.
 
 ## Installation
 
@@ -34,20 +37,15 @@ To uninstall: `spicetify config extensions gradientProgressBar.js-` then `spicet
 
 ## Usage
 
-**Right-click the song progress bar** to open the settings. Where Spicetify supports it, there's also a profile-menu entry and a top-bar button, both with a **brush icon** (a brush over a progress bar; see [Troubleshooting](#troubleshooting)). With [Gradient Connect Bar](https://github.com/VoidCrowned/spicetify-gradient-connect-bar) installed as well, the two share **one** top-bar button, *Gradient bars*, which opens a small menu with both; on its own it opens these settings straight away, as before. The profile menu keeps one entry per extension.
+**Right-click the song progress bar** to open the settings. You can also use the brush icon in the top bar or the profile menu, where Spicetify shows them ([Troubleshooting](#troubleshooting)). If you also use Gradient Connect Bar, the two share one top-bar button.
 
-- **Click a colour dot** to select it (it gets a ring) and edit it in the colour picker below the dots: drag in the square and the hue bar, use the eyedropper (where available), or type R/G/B values or a **hex code** (`#8372fd`, `8372fd` or `#87f`). Changes show on the bar as you go. The **copy icon** inside the hex field copies the colour as `#rrggbb`. With the keyboard, Enter or Space on a dot selects it and jumps to the hex field.
-- **Use theme colour** in the picker makes the selected colour follow your theme's accent; the button then reads *Following theme colour*. Hover a dot to see whether it's a theme colour.
-- **Right-click a dot** for **Duplicate** and **Remove** (also with the context-menu key or Shift+F10).
-- **Gradient** switches the gradient on and off. With only one colour, switching it on adds a second colour (a copy of the first) for you to change.
-- **− | +** (the pill after the dots): **+** adds another colour, a copy of the last one, and selects it; with two or more, gradient mode switches on. Up to 8 colours. **−** removes the selected colour (the one with the ring); at least one colour always stays.
-- **Delete** or **Backspace** on a colour dot you've tabbed to removes that colour.
-- **Spread** (below the Gradient switch) picks how the gradient covers the bar: *Compress*, *Anchored* or *Slide*. The line below the buttons describes the active one.
-- **Presets** (below Spread): click a chip to preview it. The strip in the settings window shows it (the bar behind the window stays as it is) and the chip asks *Apply?*; click it again to apply it. Escape or clicking elsewhere cancels; clicking another chip previews that one instead. After applying, *Undo* is there for 10 seconds. The built-ins only change the colours and keep your Spread choice; your own presets bring back everything they saved.
-- **+ Save** stores the current settings as your own preset: type a name and press Enter (Escape cancels). **Right-click your own preset** (or use the context-menu key) to **Rename** it, **Update** it to the current colours, or **Delete** it (with Undo).
-- **Export** (next to *Presets*) copies a short code for the current settings to the clipboard; the button shows *Copied* with a check. (If copying isn't possible at all, the code shows selected so you can copy it yourself.) **Import** opens a field: paste a code and the strip previews it; press Enter or *Apply* to use it, and you can Undo it. A code from Gradient Connect Bar brings its colours and keeps your Spread choice.
-- **Drag the dots** to reorder the gradient. With the keyboard, Alt + arrow keys move the focused colour (Alt + Home / End to the first or last place).
-- **Reset** (centred below the picker) goes back to the default: a single colour that follows your theme, no gradient. It asks for a second click to confirm: the button turns red and reads *Confirm reset?* for 3 seconds; waiting, pressing Escape or clicking anything else cancels.
+The window explains the rest, with a short help text at the bottom and tooltips on the controls.
+
+**Keyboard:**
+- Alt + ←/→ moves a colour.
+- Delete removes it.
+- Enter jumps to the hex field.
+- Shift + F10 opens a colour's menu.
 
 ## Compatibility
 
