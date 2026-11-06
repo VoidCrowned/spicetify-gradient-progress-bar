@@ -1,5 +1,7 @@
 # Gradient Progress Bar
 
+> **Moved:** Gradient Progress Bar now lives in [spicetify-gradient-bars](https://github.com/VoidCrowned/spicetify-gradient-bars), together with Gradient Connect Bar. Marketplace installs from here load it from there by themselves. This repo isn't updated any more.
+
 A [Spicetify](https://spicetify.app) extension that recolours Spotify's song progress bar — one colour, or several blended into a gradient.
 
 > **Status:** released — **v1.7.0**. See the [changelog](CHANGELOG.md) and the [roadmap](ROADMAP.md).
